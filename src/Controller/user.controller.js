@@ -50,7 +50,9 @@ const loginUser = asyncHandler(async (req, res) => {
   const isValidPassword = await user.isPasswordCorrect(password);
   if (!isValidPassword) throw new ApiError(400, "incorrect password");
   const { accessToken, refreshToken } = await genarateTokens(user._id);
-  const loginData = await User.findById(user._id).select("-password");
+  const loginData = await User.findById(user._id).select(
+    "-password -refreshToken",
+  );
   const options = {
     httpOnly: true,
     secure: false,
@@ -68,4 +70,23 @@ const loginUser = asyncHandler(async (req, res) => {
       ),
     );
 });
-export { registerUser, loginUser };
+const logoutUser = asyncHandler(async (req, res) => {
+    console.log(req.user._id);
+    
+  await User.findByIdAndUpdate(req.user._id, {
+    $unset: {
+      refreshToken: 1,
+    },
+  });
+  const options = {
+    httpOnly: true,
+    secure: false,
+  };
+
+  return res
+    .status(200)
+    .clearCookie("AccessToken", options)
+    .clearCookie("RefreshToken", options)
+    .json(new ApiResponse(200, "Logeed out successfully"));
+});
+export { registerUser, loginUser, logoutUser };
