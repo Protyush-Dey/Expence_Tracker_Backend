@@ -11,7 +11,11 @@ const genarateTokens = async (userId) => {
     const accessToken = await user.generateAccessToken();
     const refreshToken = await user.generateRefreshToken();
     user.refreshToken = refreshToken;
+
     await user.save({ validateBeforeSave: false });
+
+    const updatedUser = await User.findById(userId);
+
     return { accessToken, refreshToken };
   } catch (error) {
     throw new ApiError(400, error.message || "something went wrong");
@@ -42,15 +46,16 @@ const loginUser = asyncHandler(async (req, res) => {
   const { email, userName, password } = req.body;
   if (!email && !userName) throw new ApiError(400, "Give the feilds");
   const user = await User.findOne({ $or: [{ email }, { userName }] });
-  if(!user) throw new ApiError(400, "can not fint User")
-  const isValidPassword = await user.isPasswordCorrect(password)
-  if(!isValidPassword) throw new ApiError(400 , "incorrect password")
-  const { accessToken, refreshToken } = genarateTokens(user._id)
-  const loginData =await User.findById(user._id)
+  if (!user) throw new ApiError(400, "can not fint User");
+  const isValidPassword = await user.isPasswordCorrect(password);
+  if (!isValidPassword) throw new ApiError(400, "incorrect password");
+  const { accessToken, refreshToken } = await genarateTokens(user._id);
+  const loginData = await User.findById(user._id).select("-password");
   const options = {
-    httpOnly : true,
-    secure :true
-  }
+    httpOnly: true,
+    secure: false,
+  };
+
   return res
     .status(200)
     .cookie("AccessToken", accessToken, options)
@@ -59,8 +64,8 @@ const loginUser = asyncHandler(async (req, res) => {
       new ApiResponse(
         200,
         { user: loginData, accessToken, refreshToken },
-        "Logeed in successfully"
-      )
+        "Logeed in successfully",
+      ),
     );
 });
-export { registerUser,loginUser };
+export { registerUser, loginUser };
