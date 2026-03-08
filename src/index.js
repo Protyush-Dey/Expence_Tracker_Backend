@@ -9,7 +9,7 @@ import { app } from "./app.js";
 connectDb().
 then(()=>{
   app.listen(process.env.PORT || 8000 , ()=>{
-    console.log(`Ther port is running onP: ${process.env.PORT}`)
+    console.log(`Ther port is running on: ${process.env.PORT}`)
   })
 }).catch((err)=>{
     console.log(`DB connection error: ${err}`);
