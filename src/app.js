@@ -12,6 +12,10 @@ app.use(cookieParser());
 
 import userRoute from "./routes/user.route.js"
 app.use("/user" , userRoute);
+import accountRoute from "./routes/account.route.js"
+app.use("/account" , accountRoute);
+import expenseRoute from "./routes/expense.route.js"
+app.use("/expense" , expenseRoute);
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500
 
