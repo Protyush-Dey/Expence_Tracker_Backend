@@ -4,6 +4,8 @@ import { asyncHandler } from "../utils/AsyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
+import { generateOTP } from "../utils/otp.js";
+// import { sendMail } from "../utils/resend.js"; i delete this file but i want this function
 //genarate all token
 const genarateTokens = async (userId) => {
   try {
@@ -15,9 +17,25 @@ const genarateTokens = async (userId) => {
 
     await user.save({ validateBeforeSave: false });
 
-    const updatedUser = await User.findById(userId);
-
     return { accessToken, refreshToken };
+  } catch (error) {
+    throw new ApiError(400, error.message || "something went wrong");
+  }
+};
+
+//genarate Otp token
+const genarateOtpTokens = async (userId) => {
+  try {
+    const user = await User.findById(userId);
+    if (!user) throw new ApiError(400, "Something wentwrong");
+    const OtpToken = await user.generateOtpToken();
+    user.passwordResetToken = OtpToken;
+    user.passwordResetOTP = undefined;
+    user.passwordResetExpires = undefined;
+
+    await user.save({ validateBeforeSave: false });
+
+    return  OtpToken 
   } catch (error) {
     throw new ApiError(400, error.message || "something went wrong");
   }
@@ -68,7 +86,7 @@ const registerUser = asyncHandler(async (req, res) => {
 //login function
 const loginUser = asyncHandler(async (req, res) => {
   const { email, userName, password } = req.body;
-  if (!email && !userName) throw new ApiError(400, "Give the feilds");
+  if (!(email.trim() || userName.trim()) || !password.trim() ) throw new ApiError(400, "Give the feilds");
   const user = await User.findOne({ $or: [{ email }, { userName }] });
   if (!user) throw new ApiError(400, "can not fint User");
   const isValidPassword = await user.isPasswordCorrect(password);
@@ -84,6 +102,7 @@ const loginUser = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
+    .clearCookie("OtpToken")
     .cookie("AccessToken", accessToken, options)
     .cookie("RefreshToken", refreshToken, options)
     .json(
@@ -146,4 +165,76 @@ const resetRefreshToken = asyncHandler(async (req, res) => {
     throw new ApiError(400, error.message || "something went wrong");
   }
 });
-export { registerUser, loginUser, logoutUser, resetRefreshToken };
+
+//genrate aand send otp
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email.trim()) throw new ApiError(400, "Give the feilds");
+  const user = await User.findOne({ email });
+  if (!user) throw new ApiError(400, "account doesnot exist");
+  try {
+    const otp = generateOTP();
+    const passwordResetExpires = Date.now() + 5 * 60 * 1000;
+    user.passwordResetOTP = otp;
+    user.passwordResetExpires = passwordResetExpires;
+    await user.save({ validateBeforeSave: false });
+    // const mail = await sendMail(
+    //   email,
+    //   "OTP to change password",
+    //   `Your OTP is ${otp}`,
+    // );
+
+    // if (!mail) {
+    //   throw new ApiError(500, "Email sending failed");
+    // }
+    res
+      .status(200)
+      .json(new ApiResponse(200, `otp genarated but not going ${otp}`));
+  } catch (error) {
+    throw new ApiError(400, error.message || "somthing went wrong");
+  }
+});
+
+//genrate aand send otp
+const verifyPasswordChangeOtp = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || !otp) throw new ApiError(400, "Give the feilds");
+  const user = await User.findOne({
+    email,
+    passwordResetOTP: otp,
+    passwordResetExpires: { $gt: Date.now() },
+  });
+
+  if (!user) throw new ApiError(400, "Invalid or expired OTP");
+  const otpToken = await genarateOtpTokens(user._id)
+  const options = {
+    httpOnly:true,
+    sequre:false
+  }
+  return res.status(200).cookie("OtpToken" , otpToken , options).json(new ApiResponse(200 , "otp verified"))
+});
+
+//genrate aand send otp
+const updatePassword = asyncHandler(async(req, res) => {
+  const {password} = req.body
+  if(!password.trim()) throw new ApiError(400 , "give a password")
+  const user = await User.findById(req.user._id)
+  if(!user) throw new ApiError(400 , "user not found")
+  user.password = password
+  user.passwordResetToken = undefined
+  await user.save({ validateBeforeSave: false });
+  const options = {
+    httpOnly:true,
+    secure:false
+  }
+  return res.status(200).clearCookie("OtpToken" ,options).json(new ApiResponse(200 , "password chanched"))
+});
+export {
+  registerUser,
+  loginUser,
+  logoutUser,
+  resetRefreshToken,
+  forgotPassword,
+  verifyPasswordChangeOtp,
+  updatePassword,
+};

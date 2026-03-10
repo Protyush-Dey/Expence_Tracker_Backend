@@ -3,7 +3,8 @@ import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/AsyncHandler.js";
 import { User } from "../Models/user.model.js";
 
-export const verifyJwtToken = asyncHandler(async (req, res, next) => {
+// cheak auth with accesstoken
+ const verifyJwtToken = asyncHandler(async (req, res, next) => {
   try {
     const token =
       req.cookies?.AccessToken ||
@@ -23,3 +24,26 @@ export const verifyJwtToken = asyncHandler(async (req, res, next) => {
     );
   }
 });
+
+// cheak auth with otptoken for password change
+const verifyOtpJwtToken = asyncHandler(async (req, res, next) => {
+  try {
+    const token =
+      req.cookies?.OtpToken ||
+      req.header("Authorization")?.replace("Bearer", "");
+    if (!token) throw new ApiError(400, "unauthorized access");
+    const decodedToken = jwt.verify(token, process.env.OTP_TOKEN_SECRET);
+    const user = await User.findById(decodedToken._id).select(
+      "-password -refreshToken",
+    );
+    if (!user) throw new ApiError(400, "invalid access");
+    req.user = user;
+    next();
+  } catch (error) {
+    throw new ApiError(
+      401,
+      error.message || "something went wrong while validate",
+    );
+  }
+});
+export {verifyJwtToken , verifyOtpJwtToken}

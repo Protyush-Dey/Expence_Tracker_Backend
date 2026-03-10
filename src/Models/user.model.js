@@ -32,6 +32,15 @@ const userschema = new Schema(
     refreshToken: {
       type: String,
     },
+    passwordResetOTP: {
+      type: String,
+    },
+    passwordResetExpires: {
+      type: Date,
+    },
+    passwordResetToken: {
+      type: String,
+    },
   },
   {
     timestamps: true,
@@ -45,7 +54,7 @@ userschema.methods.isPasswordCorrect = async function (password) {
   return await bcrypt.compare(password, this.password);
 };
 userschema.methods.generateAccessToken = async function () {
-  const a= jwt.sign(
+  const a = jwt.sign(
     {
       _id: this._id,
       fullName: this.fullName,
@@ -69,6 +78,18 @@ userschema.methods.generateRefreshToken = async function () {
     process.env.REFRESH_TOKEN_SECRET,
     {
       expiresIn: process.env.REFRESH_TOKEN_EXPIRY,
+    },
+  );
+};
+userschema.methods.generateOtpToken = async function () {
+  return jwt.sign(
+    {
+      _id: this._id,
+      email:this.email
+    },
+    process.env.OTP_TOKEN_SECRET,
+    {
+      expiresIn: process.env.OTP_TOKEN_EXPIRY,
     },
   );
 };
