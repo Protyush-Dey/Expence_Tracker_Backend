@@ -35,7 +35,7 @@ const genarateOtpTokens = async (userId) => {
 
     await user.save({ validateBeforeSave: false });
 
-    return  OtpToken 
+    return OtpToken;
   } catch (error) {
     throw new ApiError(400, error.message || "something went wrong");
   }
@@ -85,9 +85,12 @@ const registerUser = asyncHandler(async (req, res) => {
 
 //login function
 const loginUser = asyncHandler(async (req, res) => {
-  const { email, userName, password } = req.body;
-  if (!(email.trim() || userName.trim()) || !password.trim() ) throw new ApiError(400, "Give the feilds");
-  const user = await User.findOne({ $or: [{ email }, { userName }] });
+  const { loginInfo, password } = req.body;
+  if (!loginInfo.trim() || !password.trim())
+    throw new ApiError(400, "Give the feilds");
+  const user = await User.findOne({
+    $or: [{ email: loginInfo.trim() }, { username: loginInfo.trim() }],
+  });
   if (!user) throw new ApiError(400, "can not fint User");
   const isValidPassword = await user.isPasswordCorrect(password);
   if (!isValidPassword) throw new ApiError(400, "incorrect password");
@@ -206,28 +209,46 @@ const verifyPasswordChangeOtp = asyncHandler(async (req, res) => {
   });
 
   if (!user) throw new ApiError(400, "Invalid or expired OTP");
-  const otpToken = await genarateOtpTokens(user._id)
+  const otpToken = await genarateOtpTokens(user._id);
   const options = {
-    httpOnly:true,
-    sequre:false
-  }
-  return res.status(200).cookie("OtpToken" , otpToken , options).json(new ApiResponse(200 , "otp verified"))
+    httpOnly: true,
+    sequre: false,
+  };
+  return res
+    .status(200)
+    .cookie("OtpToken", otpToken, options)
+    .json(new ApiResponse(200, "otp verified"));
 });
 
 //genrate aand send otp
-const updatePassword = asyncHandler(async(req, res) => {
-  const {password} = req.body
-  if(!password.trim()) throw new ApiError(400 , "give a password")
-  const user = await User.findById(req.user._id)
-  if(!user) throw new ApiError(400 , "user not found")
-  user.password = password
-  user.passwordResetToken = undefined
+const updatePassword = asyncHandler(async (req, res) => {
+  const { password } = req.body;
+  if (!password.trim()) throw new ApiError(400, "give a password");
+  const user = await User.findById(req.user._id);
+  if (!user) throw new ApiError(400, "user not found");
+  user.password = password;
+  user.passwordResetToken = undefined;
   await user.save({ validateBeforeSave: false });
   const options = {
-    httpOnly:true,
-    secure:false
-  }
-  return res.status(200).clearCookie("OtpToken" ,options).json(new ApiResponse(200 , "password chanched"))
+    httpOnly: true,
+    secure: false,
+  };
+  return res
+    .status(200)
+    .clearCookie("OtpToken", options)
+    .json(new ApiResponse(200, "password chanched"));
+});
+
+// find user to make friends
+const findUser = asyncHandler(async (req, res) => {
+  const {loginInfo} = req.params;
+  if (!loginInfo || !loginInfo.trim())
+    throw new ApiError(400, "Give the feilds");
+  const user = await User.findOne({
+    $or: [{ email: loginInfo.trim() }, { userName: loginInfo.trim() }],
+  }).select(" userName email fullName");
+  if(!user) throw new ApiError(400 , "No account found")
+  return res.status(200).json(new ApiResponse(200 , user , "account find"))
 });
 export {
   registerUser,
@@ -237,4 +258,5 @@ export {
   forgotPassword,
   verifyPasswordChangeOtp,
   updatePassword,
+  findUser
 };

@@ -15,6 +15,7 @@ const expenseSchema = mongoose.Schema(
     },
     account: {
       type: Schema.Types.ObjectId,
+      ref:"Account",
       required: true,
     },
     date: {
