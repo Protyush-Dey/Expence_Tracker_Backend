@@ -1,0 +1,25 @@
+user
+/register -> register user
+/login -> loginUser
+/logout -> logout user
+/ResetRefreshToken -> reset refreshtoken
+            <- forgot password ->
+/forgotPassword -> otp genarate and send it in mail but the mailer does not working
+/verifyPasswordChangeOtp -> verify the otp and gen a verifyJwtToken
+/updatePassword -> to find user
+------------------------------------------------
+account 
+/createAccount -> creat account of a user
+/getAllAccountDetails-> get all account of a user and their balance
+/getMonthExpenseOfAccount/:accountNo -> get current month espenses of this month
+/getExpenseOfAccountByDates/:accountNo -> get current month espenses between given dates
+/deleteAccount/:accountNo -> delete an aaccount and its expense details
+froend
+/makeRequest/:requestTo -> send friend request with requestId
+/rejectRequest/:requestId ->reject any request from any user
+/delteRequest/:requestTo -> cancel any user request
+/getAllRequestRecieved/:requestId -> get all request to user
+/getAllRequestRecieved/:requestId -> get all request from user pending
+expenses
+/createExpense -> to createExpense by  user
+split
