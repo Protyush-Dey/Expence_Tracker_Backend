@@ -45,14 +45,8 @@ const genarateOtpTokens = async (userId) => {
 
 // register user
 const registerUser = asyncHandler(async (req, res) => {
-  const { userName, fullName, email, password, account } = req.body;
-  if (
-    !userName.trim() ||
-    !fullName.trim() ||
-    !email.trim() ||
-    !password.trim() ||
-    !account.trim()
-  )
+  const { userName, fullName, email, password } = req.body;
+  if (!userName.trim() || !fullName.trim() || !email.trim() || !password.trim())
     throw new ApiError(400, "fill all feilds");
   const existUser = await User.findOne({ $or: [{ email }, { userName }] });
   if (existUser) throw new ApiError(400, "user already exist");
@@ -62,24 +56,19 @@ const registerUser = asyncHandler(async (req, res) => {
     email,
     password,
   });
-  const primaryAccount = await Account.create({
-    account: account,
-    user: user._id,
-  });
   const cashAccount = await Account.create({
     account: "cash",
     user: user._id,
   });
-  const createdUser = await User.findById(user._id).select(
-    "-password -refreshToken",
-  );
+  const createdUser = await User.findById(user._id);
   if (!createdUser) throw new ApiError(500, "user did not create");
-  const createdPrimaryAccount = await Account.findById(primaryAccount._id);
-  if (!createdPrimaryAccount)
-    throw new ApiError(500, "primary acc. did not create");
   const createdCashAccount = await Account.findById(cashAccount._id);
   if (!createdCashAccount) throw new ApiError(500, "cash acc. did not create");
-
+  await User.findByIdAndUpdate(
+    user._id,
+    { cashAccount: createdCashAccount._id },
+    { new: true },
+  );
   return res
     .status(201)
     .json(new ApiResponse(200, createdUser, "register successfully"));
@@ -98,7 +87,7 @@ const loginUser = asyncHandler(async (req, res) => {
   if (!isValidPassword) throw new ApiError(400, "incorrect password");
   const { accessToken, refreshToken } = await genarateTokens(user._id);
   const loginData = await User.findById(user._id).select(
-    "-password -refreshToken",
+    "-password -refreshToken -cashAccount -primaryAccount",
   );
   const options = {
     httpOnly: true,
@@ -296,10 +285,12 @@ const getMonthExpenseOfUser = asyncHandler(async (req, res) => {
       },
     },
     {
-      $sort:{date:-1}
-    }
+      $sort: { date: -1 },
+    },
   ]);
-  return res.status(200).json(new ApiResponse(200 , expenses , "get expenses of this month"))
+  return res
+    .status(200)
+    .json(new ApiResponse(200, expenses, "get expenses of this month"));
 });
 // get Given date expenses
 const getExpenseOfUserByDates = asyncHandler(async (req, res) => {
@@ -342,10 +333,12 @@ const getExpenseOfUserByDates = asyncHandler(async (req, res) => {
       },
     },
     {
-      $sort:{date:-1}
-    }
+      $sort: { date: -1 },
+    },
   ]);
-  return res.status(200).json(new ApiResponse(200 , expenses , "get expenses of dates"))
+  return res
+    .status(200)
+    .json(new ApiResponse(200, expenses, "get expenses of dates"));
 });
 export {
   registerUser,

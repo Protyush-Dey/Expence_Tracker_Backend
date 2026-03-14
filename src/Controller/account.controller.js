@@ -4,6 +4,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { Account } from "../Models/account.model.js";
 import { Expense } from "../Models/expences.model.js";
 import mongoose from "mongoose";
+import { User } from "../Models/user.model.js";
 // create a account
 const createAccount = asyncHandler(async (req, res) => {
   const { account } = req.body;
@@ -14,7 +15,10 @@ const createAccount = asyncHandler(async (req, res) => {
   });
   const createdAccount = await Account.findById(madeAccount._id);
   if (!createdAccount)
-    throw new ApiError(400, "something went wrong wile account create");
+    throw new ApiError(400, "something went wrong while account create");
+  const accountHolder = await User.findById(req.user._id);
+  accountHolder.primaryAccount = createdAccount._id;
+  await accountHolder.save();
   return res.status(200).json(new ApiResponse(200, "account Created"));
 });
 
@@ -182,6 +186,8 @@ const deleteAccount = asyncHandler(async (req, res) => {
   if (!account) throw new ApiError(400, "account not found");
   if (!account.user.equals(req.user._id))
     throw new ApiError(400, "Access denied");
+  const user =await User.findById(req.user._id)
+  if(user.cashAccount.equals(accountNo) || user.primaryAccount.equals(accountNo)) throw new ApiError(401 ,"you camtnot delete primary or cash account")
   const deleteExpenses = await Expense.deleteMany({ account: accountNo });
   if (!deleteExpenses) throw new ApiError(400, "expenses are not deleted");
   const deleteaccount = await Account.findByIdAndDelete(accountNo);

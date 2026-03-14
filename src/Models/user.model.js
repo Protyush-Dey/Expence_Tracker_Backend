@@ -25,6 +25,14 @@ const userschema = new Schema(
       lowercase: true,
       trim: true,
     },
+    cashAccount: {
+      type: mongoose.Types.ObjectId,
+      ref:"Account",
+    },
+    primaryAccount: {
+      type: mongoose.Types.ObjectId,
+      ref:"Account"
+    },
     password: {
       type: String,
       required: true,
