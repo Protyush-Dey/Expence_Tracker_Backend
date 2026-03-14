@@ -10,7 +10,7 @@ user
 ------------------------------------------------
 /getMonthExpenseOfUser ->   get this month expenses
 /getExpenseOfUserByDates -> get Given date expenses
-
+/changePrimaryAccount/:accountId -> change primary aaccount
 
 account 
 /createAccount -> creat account of a user

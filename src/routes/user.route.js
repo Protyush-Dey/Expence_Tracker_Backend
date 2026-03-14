@@ -11,6 +11,7 @@ import {
   findUser,
   getMonthExpenseOfUser,
   getExpenseOfUserByDates,
+  changePrimaryAccount
 } from "../Controller/user.controller.js";
 import {
   verifyJwtToken,
@@ -27,4 +28,5 @@ router.post("/updatePassword", verifyOtpJwtToken, updatePassword);
 router.get("/findUser/:loginInfo", findUser);
 router.get("/getMonthExpenseOfUser", verifyJwtToken, getMonthExpenseOfUser);
 router.get("/getExpenseOfUserByDates", verifyJwtToken, getExpenseOfUserByDates);
+router.patch("/changePrimaryAccount/:accountId", verifyJwtToken, changePrimaryAccount);
 export default router;

@@ -340,6 +340,23 @@ const getExpenseOfUserByDates = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, expenses, "get expenses of dates"));
 });
+const changePrimaryAccount = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const { accountId } = req.params;
+  const account = Account.findById(accountId);
+  if (!account) throw new ApiError(400, "no account found");
+  if (!account.user.equals(userId)) throw new ApiError(400, "access denied");
+  const user = User.findById(userId);
+  if (
+    user.cashAccount.equals(account._id) ||
+    user.primaryAccount.equals(account._id)
+  )
+    throw new ApiError(400, "use anoter account");
+  user.primaryAccount = account._id;
+
+  await user.save({ validateBeforeSave: false });
+  return res.status(200).json(new ApiResponse(200, "primary account changed"));
+});
 export {
   registerUser,
   loginUser,
@@ -351,4 +368,5 @@ export {
   findUser,
   getMonthExpenseOfUser,
   getExpenseOfUserByDates,
+  changePrimaryAccount
 };
