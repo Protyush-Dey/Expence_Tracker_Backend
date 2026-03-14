@@ -5,6 +5,8 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
 import { generateOTP } from "../utils/otp.js";
+import { Expense } from "../Models/expences.model.js";
+import mongoose from "mongoose";
 // import { sendMail } from "../utils/resend.js"; i delete this file but i want this function
 //genarate all token
 const genarateTokens = async (userId) => {
@@ -241,14 +243,109 @@ const updatePassword = asyncHandler(async (req, res) => {
 
 // find user to make friends
 const findUser = asyncHandler(async (req, res) => {
-  const {loginInfo} = req.params;
+  const { loginInfo } = req.params;
   if (!loginInfo || !loginInfo.trim())
     throw new ApiError(400, "Give the feilds");
   const user = await User.findOne({
     $or: [{ email: loginInfo.trim() }, { userName: loginInfo.trim() }],
   }).select(" userName email fullName");
-  if(!user) throw new ApiError(400 , "No account found")
-  return res.status(200).json(new ApiResponse(200 , user , "account find"))
+  if (!user) throw new ApiError(400, "No account found");
+  return res.status(200).json(new ApiResponse(200, user, "account find"));
+});
+// get this month expenses
+const getMonthExpenseOfUser = asyncHandler(async (req, res) => {
+  const user = req.user._id;
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+  const endOfMonth = new Date();
+  endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+  endOfMonth.setDate(0);
+  endOfMonth.setHours(23, 59, 59, 999);
+  const expenses = Expense.aggregate([
+    {
+      $match: {
+        date: { $gte: startOfMonth, $lt: endOfMonth },
+      },
+    },
+    {
+      $lookup: {
+        from: "accounts",
+        localField: "account",
+        foreignField: "_id",
+        as: "accounts",
+      },
+    },
+    {
+      $unwind: accounts,
+    },
+    {
+      $match: {
+        "accounts.user": new mongoose.Types.ObjectId(user),
+      },
+    },
+    {
+      $project: {
+        _id: 1,
+        expenseId: "$_id",
+        amount: "$amount",
+        desc: "$description",
+        date: "$date",
+        isGiven: "$isGiven",
+        account: "$account",
+      },
+    },
+    {
+      $sort:{date:-1}
+    }
+  ]);
+  return res.status(200).json(new ApiResponse(200 , expenses , "get expenses of this month"))
+});
+// get Given date expenses
+const getExpenseOfUserByDates = asyncHandler(async (req, res) => {
+  const user = req.user._id;
+  const { startOfMonth, endOfMonth } = req.query;
+  if (!startOfMonth || !endOfMonth) throw new ApiError(400, "send the dates");
+  const startDate = new Date(startOfMonth);
+  const endDate = new Date(endOfMonth);
+  const expenses = Expense.aggregate([
+    {
+      $match: {
+        date: { $gte: startDate, $lt: endDate },
+      },
+    },
+    {
+      $lookup: {
+        from: "accounts",
+        localField: "account",
+        foreignField: "_id",
+        as: "accounts",
+      },
+    },
+    {
+      $unwind: accounts,
+    },
+    {
+      $match: {
+        "accounts.user": new mongoose.Types.ObjectId(user),
+      },
+    },
+    {
+      $project: {
+        _id: 1,
+        expenseId: "$_id",
+        amount: "$amount",
+        desc: "$description",
+        date: "$date",
+        isGiven: "$isGiven",
+        account: "$account",
+      },
+    },
+    {
+      $sort:{date:-1}
+    }
+  ]);
+  return res.status(200).json(new ApiResponse(200 , expenses , "get expenses of dates"))
 });
 export {
   registerUser,
@@ -258,5 +355,7 @@ export {
   forgotPassword,
   verifyPasswordChangeOtp,
   updatePassword,
-  findUser
+  findUser,
+  getMonthExpenseOfUser,
+  getExpenseOfUserByDates,
 };

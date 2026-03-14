@@ -77,7 +77,7 @@ const getMonthExpenseOfAccount = asyncHandler(async (req, res) => {
   if (!accountNo) throw new ApiError(400, "send the account");
   const account = await Account.findById(accountNo);
   if (!account) throw new ApiError(400, "account not found");
-  if (account.user.toString() !== req.user.id)
+  if (!account.user.equals(req.user._id))
     throw new ApiError(400, "Access denied");
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
@@ -134,7 +134,7 @@ const getExpenseOfAccountByDates = asyncHandler(async (req, res) => {
   const endDate = new Date(endOfMonth);
   const account = await Account.findById(accountNo);
   if (!account) throw new ApiError(400, "account not found");
-  if (account.user.toString() !== req.user.id)
+  if (!account.user.equals(req.user._id))
     throw new ApiError(400, "Access denied");
   const expenses = await Expense.aggregate([
     {
@@ -180,7 +180,7 @@ const deleteAccount = asyncHandler(async (req, res) => {
   if (!accountNo) throw new ApiError(400, "send the account");
   const account = await Account.findById(accountNo);
   if (!account) throw new ApiError(400, "account not found");
-  if (account.user.toString() !== req.user.id)
+  if (!account.user.equals(req.user._id))
     throw new ApiError(400, "Access denied");
   const deleteExpenses = await Expense.deleteMany({ account: accountNo });
   if (!deleteExpenses) throw new ApiError(400, "expenses are not deleted");

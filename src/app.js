@@ -18,6 +18,8 @@ import expenseRoute from "./routes/expense.route.js"
 app.use("/expense" , expenseRoute);
 import friendRoute from "./routes/friend.route.js"
 app.use("/friend" , friendRoute);
+import splitRoute from "./routes/split.route.js"
+app.use("/split" , splitRoute);
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500
 

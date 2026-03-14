@@ -8,6 +8,8 @@ user
 /verifyPasswordChangeOtp -> verify the otp and gen a verifyJwtToken
 /updatePassword -> to find user
 ------------------------------------------------
+/getMonthExpenseOfUser ->   get this month expenses
+/getExpenseOfUserByDates -> get Given date expenses
 account 
 /createAccount -> creat account of a user
 /getAllAccountDetails-> get all account of a user and their balance
@@ -20,6 +22,12 @@ froend
 /delteRequest/:requestTo -> cancel any user request
 /getAllRequestRecieved/:requestId -> get all request to user
 /getAllRequestRecieved/:requestId -> get all request from user pending
+/acceptRequest/:requestId -> accept friend request
+/getAllFriends -> get frienlist 
+/dueGiveSplit/:friendId -> have to pay split of that friend
+/dueGetSplit/:friendId -> will get pay split of that friend
 expenses
 /createExpense -> to createExpense by  user
 split
+/createSplit -> make  group split
+/createSingleSplit -> make aa single request split
