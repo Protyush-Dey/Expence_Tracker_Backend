@@ -24,10 +24,17 @@ froend
 /getAllRequestRecieved/:requestId -> get all request from user pending
 /acceptRequest/:requestId -> accept friend request
 /getAllFriends -> get frienlist 
-/dueGiveSplit/:friendId -> have to pay split of that friend
-/dueGetSplit/:friendId -> will get pay split of that friend
+
+
+
 expenses
 /createExpense -> to createExpense by  user
+/deleteExpense -> delete expense
+
+
 split
 /createSplit -> make  group split
 /createSingleSplit -> make aa single request split
+/dueGiveSplit/:friendId -> have to pay split of that friend
+/dueGetSplit/:friendId -> will get pay split of that friend
+/deleteSplit/:splitId -> delete a split by the creator

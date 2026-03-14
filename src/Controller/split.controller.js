@@ -86,4 +86,18 @@ const dueGetSplit = asyncHandler(async (req, res) => {try {
   }
 });
 
-export { createSingleSplit, createSplit, dueGiveSplit, dueGetSplit };
+// delete split
+const deleteSplit = asyncHandler(async(req , res)=>{
+  try {
+    const user = req.user._id
+    const splitId = req.params
+    if(!splitId) throw new ApiError(400 , "give the SplitId")
+    const split = await Split.findById(splitId)
+    if(!split.splitFrom.equals(user))throw new ApiError(400 , "access denied")
+    await Split.findByIdAndDelete(splitId)
+    return res.status(200).json(200  , "Split deleted")
+  } catch (error) {
+    throw new ApiError(400 , error.message || "something went wrong")
+  }
+})
+export { createSingleSplit, createSplit, dueGiveSplit, dueGetSplit,deleteSplit };
