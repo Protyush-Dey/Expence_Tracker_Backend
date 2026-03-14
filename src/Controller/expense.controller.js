@@ -19,7 +19,7 @@ const createExpense = asyncHandler(async (req, res) => {
     description,
     isGiven,
     account,
-    date: new Date(date),
+    date: new Date(),
   });
   const createdExpense = await Expense.findById(createingExpense._id);
   if (!createdExpense) throw new ApiError(400, "Expense Does not create");
@@ -31,12 +31,14 @@ const createExpense = asyncHandler(async (req, res) => {
 // delete expense
 const deleteExpense = asyncHandler(async (req, res) => {
   const user = req.user._id;
-  const {expenseId} = req.body;
-  const expense = await Expense.findById(expenseId)
-  if(!expense) throw new ApiError(400 , "expense not found")
-  const account = await Account.findById(expense.account)
-  if(!account.user.equals(user)) throw new ApiError(400 , "access denied")
-  await Expense.findByIdAndDelete(expenseId)
-  return res.status(200).json(new ApiResponse(200 , "Expense deleted successfully")) 
+  const { expenseId } = req.body;
+  const expense = await Expense.findById(expenseId);
+  if (!expense) throw new ApiError(400, "expense not found");
+  const account = await Account.findById(expense.account);
+  if (!account.user.equals(user)) throw new ApiError(400, "access denied");
+  await Expense.findByIdAndDelete(expenseId);
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Expense deleted successfully"));
 });
-export { createExpense,deleteExpense };
+export { createExpense, deleteExpense };

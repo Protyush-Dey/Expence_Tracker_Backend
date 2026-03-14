@@ -10,12 +10,16 @@ user
 ------------------------------------------------
 /getMonthExpenseOfUser ->   get this month expenses
 /getExpenseOfUserByDates -> get Given date expenses
+
+
 account 
 /createAccount -> creat account of a user
 /getAllAccountDetails-> get all account of a user and their balance
 /getMonthExpenseOfAccount/:accountNo -> get current month espenses of this month
 /getExpenseOfAccountByDates/:accountNo -> get current month espenses between given dates
 /deleteAccount/:accountNo -> delete an aaccount and its expense details
+
+
 froend
 /makeRequest/:requestTo -> send friend request with requestId
 /rejectRequest/:requestId ->reject any request from any user
@@ -38,3 +42,7 @@ split
 /dueGiveSplit/:friendId -> have to pay split of that friend
 /dueGetSplit/:friendId -> will get pay split of that friend
 /deleteSplit/:splitId -> delete a split by the creator
+/payAllDueDone/:friendId ->pay all dues
+/payDueDone ->pay one dues
+/markAllDueDone/:friendId -> mark all dues
+/markDueDone -> mark one dues
