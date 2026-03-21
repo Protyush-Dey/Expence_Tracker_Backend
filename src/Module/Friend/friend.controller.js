@@ -1,9 +1,9 @@
-import { asyncHandler } from "../utils/AsyncHandler.js";
-import { ApiError } from "../utils/ApiError.js";
-import { ApiResponse } from "../utils/ApiResponse.js";
+import { asyncHandler } from "../../utils/AsyncHandler.js";
+import { ApiError } from "../../utils/ApiError.js";
+import { ApiResponse } from "../../utils/ApiResponse.js";
 import { FriendRequest } from "../Models/friendRequest.model.js";
-import { User } from "../Models/user.model.js";
-import { Friend } from "../Models/friends.model.js";
+import { User } from "../User/user.model.js";
+import { Friend } from "./friends.model.js";
 // make friend request
 const makeRequest = asyncHandler(async (req, res) => {
   const { requestTo } = req.params;

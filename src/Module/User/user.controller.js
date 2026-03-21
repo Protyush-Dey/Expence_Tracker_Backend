@@ -1,13 +1,15 @@
-import { User } from "../Models/user.model.js";
-import { Account } from "../Models/account.model.js";
-import { asyncHandler } from "../utils/AsyncHandler.js";
-import { ApiError } from "../utils/ApiError.js";
-import { ApiResponse } from "../utils/ApiResponse.js";
+import { User } from "../../Models/user.model.js";
+import { Account } from "../Account/account.model.js";
+import { asyncHandler } from "../../utils/AsyncHandler.js";
+import { ApiError } from "../../utils/ApiError.js";
+import { ApiResponse } from "../../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
-import { generateOTP } from "../utils/otp.js";
-import { Expense } from "../Models/expences.model.js";
+import { generateOTP } from "../../utils/otp.js";
+import { Expense } from "../Expense/expences.model.js";
 import mongoose from "mongoose";
+// import { sendMail } from "../utils/sendMail.js";
 // import { sendMail } from "../utils/resend.js"; i delete this file but i want this function
+
 //genarate all token
 const genarateTokens = async (userId) => {
   try {
@@ -368,5 +370,5 @@ export {
   findUser,
   getMonthExpenseOfUser,
   getExpenseOfUserByDates,
-  changePrimaryAccount
+  changePrimaryAccount,
 };

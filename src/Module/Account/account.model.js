@@ -1,5 +1,5 @@
 import mongoose, { Schema } from "mongoose";
-import { User } from "./user.model.js";
+import { User } from "../User/user.model.js";
 const accountSchema = mongoose.Schema({
   account: {
     type: String,

@@ -1,7 +1,7 @@
-import { asyncHandler } from "../utils/AsyncHandler.js";
-import { ApiError } from "../utils/ApiError.js";
-import { ApiResponse } from "../utils/ApiResponse.js";
-import { Split } from "../Models/split.model.js";
+import { asyncHandler } from "../../utils/AsyncHandler.js";
+import { ApiError } from "../../utils/ApiError.js";
+import { ApiResponse } from "../../utils/ApiResponse.js";
+import { Split } from "./split.model.js";
 import { User } from "../Models/user.model.js";
 import { Expense } from "../Models/expences.model.js";
 

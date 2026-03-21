@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { verifyJwtToken } from "../middleware/Auth.middleware.js";
+import { verifyJwtToken } from "../../middleware/Auth.middleware.js";
 import {
   createSingleSplit,
   createSplit,

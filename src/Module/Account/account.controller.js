@@ -1,10 +1,10 @@
-import { asyncHandler } from "../utils/AsyncHandler.js";
-import { ApiError } from "../utils/ApiError.js";
-import { ApiResponse } from "../utils/ApiResponse.js";
+import { asyncHandler } from "../../utils/AsyncHandler.js";
+import { ApiError } from "../../utils/ApiError.js";
+import { ApiResponse } from "../../utils/ApiResponse.js";
 import { Account } from "../Models/account.model.js";
-import { Expense } from "../Models/expences.model.js";
+import { Expense } from "../Expense/expences.model.js";
 import mongoose from "mongoose";
-import { User } from "../Models/user.model.js";
+import { User } from "../User/user.model.js";
 // create a account
 const createAccount = asyncHandler(async (req, res) => {
   const { account } = req.body;

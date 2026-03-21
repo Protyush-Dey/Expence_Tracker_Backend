@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { makeRequest, rejectRequest, delteRequest, getAllRequestRecieved, getAllRequestDone, acceptRequest, getAllFriends, } from "../Controller/friend.controller.js";
-import { verifyJwtToken } from "../middleware/Auth.middleware.js";
+import { verifyJwtToken } from "../../middleware/Auth.middleware.js";
 
 const router = Router()
 

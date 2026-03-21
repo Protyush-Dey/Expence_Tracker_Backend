@@ -12,11 +12,11 @@ import {
   getMonthExpenseOfUser,
   getExpenseOfUserByDates,
   changePrimaryAccount
-} from "../Controller/user.controller.js";
+} from "./user.controller.js";
 import {
   verifyJwtToken,
   verifyOtpJwtToken,
-} from "../middleware/Auth.middleware.js";
+} from "../../middleware/Auth.middleware.js";
 const router = Router();
 router.post("/register", registerUser);
 router.post("/login", loginUser);
