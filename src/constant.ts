@@ -1,1 +1,1 @@
-export const DB_NAME = "Expence_Tracker"
+export const DB_NAME : String = "Expence_Tracker"
