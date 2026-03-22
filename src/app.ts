@@ -10,15 +10,15 @@ app.use(express.json({ limit: "16kb" }))
 app.use(express.urlencoded({ extended: true, limit: "16kb" }))
 app.use(cookieParser());
 
-import userRoute from "./routes/user.route.js"
+import userRoute from "./routes/user.route.ts"
 app.use("/user" , userRoute);
-import accountRoute from "./routes/account.route.js"
+import accountRoute from "./routes/account.route.ts"
 app.use("/account" , accountRoute);
-import expenseRoute from "./routes/expense.route.js"
+import expenseRoute from "./routes/expense.route.ts"
 app.use("/expense" , expenseRoute);
-import friendRoute from "./routes/friend.route.js"
+import friendRoute from "./routes/friend.route.ts"
 app.use("/friend" , friendRoute);
-import splitRoute from "./routes/split.route.js"
+import splitRoute from "./routes/split.route.ts"
 app.use("/split" , splitRoute);
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500

@@ -1,7 +1,7 @@
 import { User } from "../../Models/user.model.js";
 import { Account } from "../Account/account.model.js";
 import { asyncHandler } from "../../utils/AsyncHandler.js";
-import { ApiError } from "../../utils/ApiError.js";
+import { ApiError } from "../../utils/ApiError.ts/index.js";
 import { ApiResponse } from "../../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
 import { generateOTP } from "../../utils/otp.js";
