@@ -1,17 +1,23 @@
-import mongoose, { Schema } from "mongoose";
-import { User } from "../User/user.model.js";
-const accountSchema = mongoose.Schema({
-  account: {
-    type: String,
-    required: true,
-  },
-  user:{
-    type:Schema.Types.ObjectId,
-    ref:"User"
-  }
-},
-{
-    timestamp:true
-});
+import { modelOptions, prop, Ref } from "@typegoose/typegoose";
+import { User } from "../User/user.model";
+import mongoose from "mongoose";
 
-export const Account = mongoose.model("Account", accountSchema);
+@modelOptions({
+  schemaOptions: {
+    timestamps: true,
+    collection: "accounts",
+  },
+})
+export class Account {
+  @prop({
+    required: true,
+    type: () => String,
+  })
+  public account!: string;
+
+  @prop({
+    ref: () => User,
+    type: () => mongoose.Schema.ObjectId,
+  })
+  public user?: Ref<User>;
+}

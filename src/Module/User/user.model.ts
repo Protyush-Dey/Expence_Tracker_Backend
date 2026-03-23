@@ -6,10 +6,12 @@ import {
   pre,
   DocumentType,
 } from "@typegoose/typegoose";
+import mongoose from "mongoose";
+
 import bcrypt from "bcrypt";
 import jwt, { SignOptions } from "jsonwebtoken";
-import mongoose from "mongoose";
 import "dotenv/config";
+import { Account } from "../Account/account.model";
 
 // 🔥 Pre hook for password hashing
 @pre<User>("save", async function () {
@@ -29,6 +31,7 @@ export class User {
     lowercase: true,
     trim: true,
     index: true,
+    type: () => String,
   })
   public userName!: string;
 
@@ -36,6 +39,7 @@ export class User {
     required: true,
     trim: true,
     index: true,
+    type: () => String,
   })
   public fullName!: string;
 
@@ -44,11 +48,12 @@ export class User {
     unique: true,
     lowercase: true,
     trim: true,
+    type: () => String,
   })
   public email!: string;
 
   @prop({
-    ref: "Account",
+    ref: () => Account,
     type: () => mongoose.Schema.Types.ObjectId,
   })
   public cashAccount?: Ref<any>;
@@ -57,10 +62,11 @@ export class User {
     ref: "Account",
     type: () => mongoose.Schema.Types.ObjectId,
   })
-  public primaryAccount?: Ref<any>;
+  public primaryAccount?: Ref<Account>;
 
   @prop({
     required: true,
+    type: () => String,
   })
   public password!: string;
 
@@ -125,7 +131,7 @@ export class User {
 
   public generateOtpToken(this: DocumentType<User>): string {
     const secret = process.env.OTP_TOKEN_SECRET;
-    const expiry = process.env.otp_TOKEN_EXPIRY;
+    const expiry = process.env.OTP_TOKEN_EXPIRY;
 
     if (!secret || !expiry) {
       throw new Error("JWT env variables missing");
