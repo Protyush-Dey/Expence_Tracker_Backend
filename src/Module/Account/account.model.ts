@@ -1,6 +1,12 @@
-import { modelOptions, prop, Ref } from "@typegoose/typegoose";
-import { User } from "../User/user.model";
+import {
+  modelOptions,
+  prop,
+  Ref,
+  getModelForClass,
+} from "@typegoose/typegoose";
 import mongoose from "mongoose";
+import { BaseModel } from "../../Base/Base.model";
+import { User } from "../User/user.model";
 
 @modelOptions({
   schemaOptions: {
@@ -8,16 +14,15 @@ import mongoose from "mongoose";
     collection: "accounts",
   },
 })
-export class Account {
-  @prop({
-    required: true,
-    type: () => String,
-  })
+export class Account extends BaseModel {
+  @prop({ required: true, type: () => String })
   public account!: string;
 
   @prop({
     ref: () => User,
-    type: () => mongoose.Schema.ObjectId,
+    type: () => mongoose.Schema.Types.ObjectId,
   })
   public user?: Ref<User>;
 }
+
+export const AccountModel = getModelForClass(Account);

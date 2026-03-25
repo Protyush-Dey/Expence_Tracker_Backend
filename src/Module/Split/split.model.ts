@@ -1,11 +1,12 @@
-import mongoose from "mongoose";
 import {
   modelOptions,
   prop,
   Ref,
   getModelForClass,
 } from "@typegoose/typegoose";
-import { User } from "../User/user.model.js";
+import mongoose from "mongoose";
+import { BaseModel } from "../../Base/Base.model";
+import { User } from "../User/user.model";
 
 @modelOptions({
   schemaOptions: {
@@ -13,7 +14,7 @@ import { User } from "../User/user.model.js";
     collection: "splits",
   },
 })
-export class Split {
+export class Split extends BaseModel {
   @prop({
     ref: () => User,
     type: () => mongoose.Schema.Types.ObjectId,
@@ -28,17 +29,10 @@ export class Split {
   })
   public splitTo!: Ref<User>;
 
-  @prop({
-    required: true,
-    type: () => Number,
-  })
+  @prop({ required: true, type: () => Number })
   public amount!: number;
 
-  @prop({
-    required: true,
-    type: () => String,
-    trim: true,
-  })
+  @prop({ required: true, type: () => String, trim: true })
   public description!: string;
 }
 

@@ -1,11 +1,12 @@
-import mongoose from "mongoose";
 import {
   modelOptions,
   prop,
   Ref,
   getModelForClass,
 } from "@typegoose/typegoose";
-import { User } from "../User/user.model.js";
+import mongoose from "mongoose";
+import { BaseModel } from "../../Base/Base.model";
+import { User } from "../User/user.model";
 
 @modelOptions({
   schemaOptions: {
@@ -13,7 +14,7 @@ import { User } from "../User/user.model.js";
     collection: "friends",
   },
 })
-export class Friend {
+export class Friend extends BaseModel {
   @prop({
     type: () => [mongoose.Schema.Types.ObjectId],
     ref: () => User,
