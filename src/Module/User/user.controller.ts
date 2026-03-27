@@ -1,374 +1,174 @@
-import { User } from "../../Models/user.model.js";
-import { Account } from "../Account/account.model.js";
-import { asyncHandler } from "../../utils/AsyncHandler.js";
-import { ApiError } from "../../utils/ApiError.ts/index.js";
-import { ApiResponse } from "../../utils/ApiResponse.js";
-import jwt from "jsonwebtoken";
-import { generateOTP } from "../../utils/otp.js";
-import { Expense } from "../Expense/expences.model.js";
-import mongoose from "mongoose";
-// import { sendMail } from "../utils/sendMail.js";
-// import { sendMail } from "../utils/resend.js"; i delete this file but i want this function
+import { Request, Response } from "express";
+import { asyncHandler } from "../../utils/AsyncHandler";
+import { ApiError } from "../../utils/ApiError";
+import { ApiResponse } from "../../utils/ApiResponse";
+import { BaseController } from "../../Base/Base.controller";
+import { UserService } from "./user.service";
 
-//genarate all token
-const genarateTokens = async (userId) => {
-  try {
-    const user = await User.findById(userId);
-    if (!user) throw new ApiError(400, "Something wentwrong");
-    const accessToken = await user.generateAccessToken();
-    const refreshToken = await user.generateRefreshToken();
-    user.refreshToken = refreshToken;
+const userService = new UserService();
 
-    await user.save({ validateBeforeSave: false });
+class UserController extends BaseController {
+  // register the user
+  registerUser = asyncHandler(async (req: Request, res: Response) => {
+    const { userName, fullName, email, password } = req.body as Record<
+      string,
+      string
+    >;
+    if (
+      !userName?.trim() ||
+      !fullName?.trim() ||
+      !email?.trim() ||
+      !password?.trim()
+    )
+      throw new ApiError(400, "All fields are required");
 
-    return { accessToken, refreshToken };
-  } catch (error) {
-    throw new ApiError(400, error.message || "something went wrong");
-  }
-};
-
-//genarate Otp token
-const genarateOtpTokens = async (userId) => {
-  try {
-    const user = await User.findById(userId);
-    if (!user) throw new ApiError(400, "Something wentwrong");
-    const OtpToken = await user.generateOtpToken();
-    user.passwordResetToken = OtpToken;
-    user.passwordResetOTP = undefined;
-    user.passwordResetExpires = undefined;
-
-    await user.save({ validateBeforeSave: false });
-
-    return OtpToken;
-  } catch (error) {
-    throw new ApiError(400, error.message || "something went wrong");
-  }
-};
-
-// register user
-const registerUser = asyncHandler(async (req, res) => {
-  const { userName, fullName, email, password } = req.body;
-  if (!userName.trim() || !fullName.trim() || !email.trim() || !password.trim())
-    throw new ApiError(400, "fill all feilds");
-  const existUser = await User.findOne({ $or: [{ email }, { userName }] });
-  if (existUser) throw new ApiError(400, "user already exist");
-  const user = await User.create({
-    userName: userName.toLowerCase(),
-    fullName,
-    email,
-    password,
+    const user = await userService.registerUser({
+      userName,
+      fullName,
+      email,
+      password,
+    });
+    return this.created(res, "Registered successfully", user);
   });
-  const cashAccount = await Account.create({
-    account: "cash",
-    user: user._id,
-  });
-  const createdUser = await User.findById(user._id);
-  if (!createdUser) throw new ApiError(500, "user did not create");
-  const createdCashAccount = await Account.findById(cashAccount._id);
-  if (!createdCashAccount) throw new ApiError(500, "cash acc. did not create");
-  await User.findByIdAndUpdate(
-    user._id,
-    { cashAccount: createdCashAccount._id },
-    { new: true },
-  );
-  return res
-    .status(201)
-    .json(new ApiResponse(200, createdUser, "register successfully"));
-});
 
-//login function
-const loginUser = asyncHandler(async (req, res) => {
-  const { loginInfo, password } = req.body;
-  if (!loginInfo.trim() || !password.trim())
-    throw new ApiError(400, "Give the feilds");
-  const user = await User.findOne({
-    $or: [{ email: loginInfo.trim() }, { username: loginInfo.trim() }],
-  });
-  if (!user) throw new ApiError(400, "can not fint User");
-  const isValidPassword = await user.isPasswordCorrect(password);
-  if (!isValidPassword) throw new ApiError(400, "incorrect password");
-  const { accessToken, refreshToken } = await genarateTokens(user._id);
-  const loginData = await User.findById(user._id).select(
-    "-password -refreshToken -cashAccount -primaryAccount",
-  );
-  const options = {
-    httpOnly: true,
-    secure: false,
-  };
-
-  return res
-    .status(200)
-    .clearCookie("OtpToken")
-    .cookie("AccessToken", accessToken, options)
-    .cookie("RefreshToken", refreshToken, options)
-    .json(
-      new ApiResponse(
-        200,
-        { user: loginData, accessToken, refreshToken },
-        "Logeed in successfully",
-      ),
-    );
-});
-
-//logout user
-const logoutUser = asyncHandler(async (req, res) => {
-  console.log(req.user._id);
-
-  await User.findByIdAndUpdate(req.user._id, {
-    $unset: {
-      refreshToken: 1,
-    },
-  });
-  const options = {
-    httpOnly: true,
-    secure: false,
-  };
-
-  return res
-    .status(200)
-    .clearCookie("AccessToken", options)
-    .clearCookie("RefreshToken", options)
-    .json(new ApiResponse(200, "Logeed out successfully"));
-});
-
-//reset refreshtoken
-const resetRefreshToken = asyncHandler(async (req, res) => {
-  const incomingRefToken = req.cookies.RefreshToken || req.header.refreshToken;
-
-  if (!incomingRefToken) throw new ApiError(400, "Unauthortized access");
-  try {
-    const decodedToken = jwt.verify(
-      incomingRefToken,
-      process.env.REFRESH_TOKEN_SECRET,
-    );
-    console.log("gdfgd", incomingRefToken);
-    const user = await User.findById(decodedToken._id);
-    if (!user) throw new ApiError(400, "invalid token");
-    if (user?.refreshToken !== incomingRefToken)
-      throw new ApiError(400, "refresh token used or expired");
-    const { accessToken, refreshToken } = await genarateTokens(user._id);
-    const options = {
-      httpOnly: true,
-      secure: false,
+  // login the user
+  loginUser = asyncHandler(async (req: Request, res: Response) => {
+    const { loginInfo, password } = req.body as {
+      loginInfo: string;
+      password: string;
     };
+    if (!loginInfo?.trim() || !password?.trim())
+      throw new ApiError(400, "All fields are required");
+
+    const { loginData, accessToken, refreshToken } =
+      await userService.loginUser(loginInfo, password);
 
     return res
       .status(200)
-      .cookie("AccessToken", accessToken, options)
-      .cookie("RefreshToken", refreshToken, options)
-      .json(new ApiResponse(200, "token Update successfully"));
-  } catch (error) {
-    throw new ApiError(400, error.message || "something went wrong");
-  }
-});
-
-//genrate aand send otp
-const forgotPassword = asyncHandler(async (req, res) => {
-  const { email } = req.body;
-  if (!email.trim()) throw new ApiError(400, "Give the feilds");
-  const user = await User.findOne({ email });
-  if (!user) throw new ApiError(400, "account doesnot exist");
-  try {
-    const otp = generateOTP();
-    const passwordResetExpires = Date.now() + 5 * 60 * 1000;
-    user.passwordResetOTP = otp;
-    user.passwordResetExpires = passwordResetExpires;
-    await user.save({ validateBeforeSave: false });
-    // const mail = await sendMail(
-    //   email,
-    //   "OTP to change password",
-    //   `Your OTP is ${otp}`,
-    // );
-
-    // if (!mail) {
-    //   throw new ApiError(500, "Email sending failed");
-    // }
-    res
-      .status(200)
-      .json(new ApiResponse(200, `otp genarated but not going ${otp}`));
-  } catch (error) {
-    throw new ApiError(400, error.message || "somthing went wrong");
-  }
-});
-
-//genrate aand send otp
-const verifyPasswordChangeOtp = asyncHandler(async (req, res) => {
-  const { email, otp } = req.body;
-  if (!email || !otp) throw new ApiError(400, "Give the feilds");
-  const user = await User.findOne({
-    email,
-    passwordResetOTP: otp,
-    passwordResetExpires: { $gt: Date.now() },
+      .clearCookie("OtpToken")
+      .cookie("AccessToken", accessToken, this.cookieOptions)
+      .cookie("RefreshToken", refreshToken, this.cookieOptions)
+      .json(
+        new ApiResponse(200, "Logged in successfully", {
+          user: loginData,
+        }),
+      );
   });
 
-  if (!user) throw new ApiError(400, "Invalid or expired OTP");
-  const otpToken = await genarateOtpTokens(user._id);
-  const options = {
-    httpOnly: true,
-    sequre: false,
-  };
-  return res
-    .status(200)
-    .cookie("OtpToken", otpToken, options)
-    .json(new ApiResponse(200, "otp verified"));
-});
+  //logout user
+  logoutUser = asyncHandler(async (req: Request, res: Response) => {
+    await userService.logoutUser(this.getUserId(req));
+    return res
+      .status(200)
+      .clearCookie("AccessToken", this.cookieOptions)
+      .clearCookie("RefreshToken", this.cookieOptions)
+      .json(new ApiResponse(200, "Logged out successfully"));
+  });
 
-//genrate aand send otp
-const updatePassword = asyncHandler(async (req, res) => {
-  const { password } = req.body;
-  if (!password.trim()) throw new ApiError(400, "give a password");
-  const user = await User.findById(req.user._id);
-  if (!user) throw new ApiError(400, "user not found");
-  user.password = password;
-  user.passwordResetToken = undefined;
-  await user.save({ validateBeforeSave: false });
-  const options = {
-    httpOnly: true,
-    secure: false,
-  };
-  return res
-    .status(200)
-    .clearCookie("OtpToken", options)
-    .json(new ApiResponse(200, "password chanched"));
-});
+  // reset refresh token
+  resetRefreshToken = asyncHandler(async (req: Request, res: Response) => {
+    const incomingRefToken =
+      req.cookies?.RefreshToken ||
+      (req.headers["refreshtoken"] as string | undefined);
+    if (!incomingRefToken) throw new ApiError(401, "Unauthorized access");
 
-// find user to make friends
-const findUser = asyncHandler(async (req, res) => {
-  const { loginInfo } = req.params;
-  if (!loginInfo || !loginInfo.trim())
-    throw new ApiError(400, "Give the feilds");
-  const user = await User.findOne({
-    $or: [{ email: loginInfo.trim() }, { userName: loginInfo.trim() }],
-  }).select(" userName email fullName");
-  if (!user) throw new ApiError(400, "No account found");
-  return res.status(200).json(new ApiResponse(200, user, "account find"));
-});
-// get this month expenses
-const getMonthExpenseOfUser = asyncHandler(async (req, res) => {
-  const user = req.user._id;
-  const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
-  const endOfMonth = new Date();
-  endOfMonth.setMonth(endOfMonth.getMonth() + 1);
-  endOfMonth.setDate(0);
-  endOfMonth.setHours(23, 59, 59, 999);
-  const expenses = Expense.aggregate([
-    {
-      $match: {
-        date: { $gte: startOfMonth, $lt: endOfMonth },
-      },
-    },
-    {
-      $lookup: {
-        from: "accounts",
-        localField: "account",
-        foreignField: "_id",
-        as: "accounts",
-      },
-    },
-    {
-      $unwind: accounts,
-    },
-    {
-      $match: {
-        "accounts.user": new mongoose.Types.ObjectId(user),
-      },
-    },
-    {
-      $project: {
-        _id: 1,
-        expenseId: "$_id",
-        amount: "$amount",
-        desc: "$description",
-        date: "$date",
-        isGiven: "$isGiven",
-        account: "$account",
-      },
-    },
-    {
-      $sort: { date: -1 },
-    },
-  ]);
-  return res
-    .status(200)
-    .json(new ApiResponse(200, expenses, "get expenses of this month"));
-});
-// get Given date expenses
-const getExpenseOfUserByDates = asyncHandler(async (req, res) => {
-  const user = req.user._id;
-  const { startOfMonth, endOfMonth } = req.query;
-  if (!startOfMonth || !endOfMonth) throw new ApiError(400, "send the dates");
-  const startDate = new Date(startOfMonth);
-  const endDate = new Date(endOfMonth);
-  const expenses = Expense.aggregate([
-    {
-      $match: {
-        date: { $gte: startDate, $lt: endDate },
-      },
-    },
-    {
-      $lookup: {
-        from: "accounts",
-        localField: "account",
-        foreignField: "_id",
-        as: "accounts",
-      },
-    },
-    {
-      $unwind: accounts,
-    },
-    {
-      $match: {
-        "accounts.user": new mongoose.Types.ObjectId(user),
-      },
-    },
-    {
-      $project: {
-        _id: 1,
-        expenseId: "$_id",
-        amount: "$amount",
-        desc: "$description",
-        date: "$date",
-        isGiven: "$isGiven",
-        account: "$account",
-      },
-    },
-    {
-      $sort: { date: -1 },
-    },
-  ]);
-  return res
-    .status(200)
-    .json(new ApiResponse(200, expenses, "get expenses of dates"));
-});
-const changePrimaryAccount = asyncHandler(async (req, res) => {
-  const userId = req.user._id;
-  const { accountId } = req.params;
-  const account = Account.findById(accountId);
-  if (!account) throw new ApiError(400, "no account found");
-  if (!account.user.equals(userId)) throw new ApiError(400, "access denied");
-  const user = User.findById(userId);
-  if (
-    user.cashAccount.equals(account._id) ||
-    user.primaryAccount.equals(account._id)
-  )
-    throw new ApiError(400, "use anoter account");
-  user.primaryAccount = account._id;
+    const { accessToken, refreshToken } =
+      await userService.resetRefreshToken(incomingRefToken);
 
-  await user.save({ validateBeforeSave: false });
-  return res.status(200).json(new ApiResponse(200, "primary account changed"));
-});
-export {
-  registerUser,
-  loginUser,
-  logoutUser,
-  resetRefreshToken,
-  forgotPassword,
-  verifyPasswordChangeOtp,
-  updatePassword,
-  findUser,
-  getMonthExpenseOfUser,
-  getExpenseOfUserByDates,
-  changePrimaryAccount,
-};
+    return res
+      .status(200)
+      .cookie("AccessToken", accessToken, this.cookieOptions)
+      .cookie("RefreshToken", refreshToken, this.cookieOptions)
+      .json(new ApiResponse(200, "Token updated successfully"));
+  });
+
+  //forgot password
+  forgotPassword = asyncHandler(async (req: Request, res: Response) => {
+    const { email } = req.body as { email: string };
+    if (!email?.trim()) throw new ApiError(400, "Give the fields");
+
+    const otp = await userService.initForgotPassword(email);
+    return res.status(200).json(new ApiResponse(200, "OTP generated", { otp }));
+  });
+
+  //verify otp for password
+  verifyPasswordChangeOtp = asyncHandler(
+    async (req: Request, res: Response) => {
+      const { email, otp } = req.body as { email: string; otp: string };
+      if (!email || !otp) throw new ApiError(400, "Give the fields");
+
+      const otpToken = await userService.verifyOtp(email, otp);
+      return res
+        .status(200)
+        .cookie("OtpToken", otpToken, this.cookieOptions)
+        .json(new ApiResponse(200, "OTP verified"));
+    },
+  );
+
+  // update password
+  updatePassword = asyncHandler(async (req: Request, res: Response) => {
+    const { password } = req.body as { password: string };
+    if (!password?.trim()) throw new ApiError(400, "Give a password");
+
+    await userService.updatePassword(this.getUserId(req), password);
+    return res
+      .status(200)
+      .clearCookie("OtpToken", this.cookieOptions)
+      .json(new ApiResponse(200, "Password changed"));
+  });
+
+  // find a friend
+  findUser = asyncHandler(async (req: Request, res: Response) => {
+    const { loginInfo } = req.params;
+    if (!loginInfo?.toString().trim())
+      throw new ApiError(400, "Give the fields");
+
+    const user = await userService.findUser(loginInfo.toString());
+    return res.status(200).json(new ApiResponse(200, "Account found", user));
+  });
+
+  // get expense with the same month
+  getMonthExpenseOfUser = asyncHandler(async (req: Request, res: Response) => {
+    const expenses = await userService.getExpenseOfUserByDates(
+      this.getUserId(req),
+    );
+    return res
+      .status(200)
+      .json(new ApiResponse(200, "Get expenses of this month", expenses));
+  });
+
+  // get expense with the given date
+  getExpenseOfUserByDates = asyncHandler(
+    async (req: Request, res: Response) => {
+      const { startOfMonth, endOfMonth } = req.query as {
+        startOfMonth?: string;
+        endOfMonth?: string;
+      };
+      if (!startOfMonth || !endOfMonth)
+        throw new ApiError(400, "Send the dates");
+
+      const expenses = await userService.getExpenseOfUserByDates(
+        this.getUserId(req),
+        startOfMonth,
+        endOfMonth,
+      );
+      return res
+        .status(200)
+        .json(new ApiResponse(200, "Get expenses of dates", expenses));
+    },
+  );
+
+  // change primary account
+  changePrimaryAccount = asyncHandler(async (req: Request, res: Response) => {
+    const { accountId } = req.params;
+    await userService.changePrimaryAccount(
+      this.getUserId(req),
+      accountId.toString(),
+    );
+    return res
+      .status(200)
+      .json(new ApiResponse(200, "Primary account changed"));
+  });
+}
+
+export const userController = new UserController();

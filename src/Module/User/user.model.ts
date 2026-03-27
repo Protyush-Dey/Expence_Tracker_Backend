@@ -69,8 +69,6 @@ export class User extends BaseModel {
   @prop({ type: () => Date })
   public passwordResetExpires?: Date;
 
-  @prop({ type: () => String })
-  public passwordResetToken?: string;
 
   // functions
 
