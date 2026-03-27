@@ -1,7 +1,7 @@
 user
 /register -> register user
-/login -> loginUser
-/logout -> logout user
+/logIn -> loginUser
+/logOut -> logout user
 /ResetRefreshToken -> reset refreshtoken
             <- forgot password ->
 /forgotPassword -> otp genarate and send it in mail but the mailer does not working
