@@ -3,6 +3,7 @@ import cors from "cors";
 import http from "http";
 import  {connectDb} from "./config/mongooseConfig";
 import cookieParser from "cookie-parser";
+import initializeModules from "./Module/main.route";
 
 // dot env
 
@@ -18,6 +19,8 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }))
 app.use(cookieParser());
 
 const server = http.createServer(app);
+
+initializeModules(app);
 
 // connect mongodb
 const PORT = process.env.PORT || 8000
