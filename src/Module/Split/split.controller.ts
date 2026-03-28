@@ -1,250 +1,98 @@
-import { asyncHandler } from "../../utils/AsyncHandler.js";
-import { ApiError } from "../../utils/ApiError.ts/index.js";
-import { ApiResponse } from "../../utils/ApiResponse.js";
-import { Split } from "./split.model.js";
-import { User } from "../Models/user.model.js";
-import { Expense } from "../Models/expences.model.js";
+import { Request, Response } from "express";
+import { asyncHandler } from "../../utils/AsyncHandler";
+import { ApiError } from "../../utils/ApiError";
+import { ApiResponse } from "../../utils/ApiResponse";
+import { BaseController } from "../../Base/Base.controller";
+import { SplitService } from "./split.service";
 
-//make a single split
-const createSingleSplit = asyncHandler(async (req, res) => {
-  const user = req.user._id;
-  const { splitTo, amount, description } = req.body;
-  if (description.trim() == "" || !amount || !splitTo)
-    throw new ApiError(400, "give all feilds");
-  const split = Split.create({
-    splitFrom: user,
-    splitTo,
-    amount,
-    description,
+const splitService = new SplitService();
+
+class SplitController extends BaseController {
+  createSingleSplit = asyncHandler(async (req: Request, res: Response) => {
+    const { splitTo, amount, description } = req.body as {
+      splitTo: string;
+      amount: number;
+      description: string;
+    };
+    if (!description?.trim() || !amount || !splitTo)
+      throw new ApiError(400, "Give all fields");
+
+    const split = await splitService.createSingleSplit({
+      splitFrom: this.getUserId(req),
+      splitTo,
+      amount,
+      description,
+    });
+    return res.status(200).json(new ApiResponse(200, "Split made successfully", split));
   });
-  const createdSplit = Split.findById(split._id);
-  if (!createdSplit) throw new ApiError(400, "split does not created");
-  return res.status(200).json(new ApiResponse(200, "split made successfully"));
-});
-//make all split to give
-const createSplit = asyncHandler(async (req, res) => {
-  const user = req.user._id;
-  const { details, description } = req.body;
-  if (description.trim() == "" || !details.length)
-    throw new ApiError(400, "give all feilds");
-  const splits = details.map((d) => ({
-    splitFrom: user,
-    splitTo: d.splitTo,
-    amount: d.amount,
-    description: description,
-  }));
-  await Split.insertMany(splits);
-  return res.status(200).json(new ApiResponse(200, "split made successfully"));
-});
-//get alldue split to give
-const dueGiveSplit = asyncHandler(async (req, res) => {
-  try {
-    const user = req.user._id;
+
+  createSplit = asyncHandler(async (req: Request, res: Response) => {
+    const { details, description } = req.body as {
+      details: Array<{ splitTo: string; amount: number }>;
+      description: string;
+    };
+    if (!description?.trim() || !details?.length)
+      throw new ApiError(400, "Give all fields");
+
+    await splitService.createBulkSplits(this.getUserId(req), description, details);
+    return res.status(200).json(new ApiResponse(200, "Split made successfully"));
+  });
+
+  dueGiveSplit = asyncHandler(async (req: Request, res: Response) => {
     const { friendId } = req.params;
-    if (!friendId) throw new ApiError(400, "give the friend id");
-    const splits = await Split.aggregate([
-      {
-        $match: {
-          splitFrom: new mongoose.Types.ObjectId(friendId),
-          splitTo: new mongoose.Types.ObjectId(user),
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          totalAmount: { $sum: "$amount" },
-          splits: { $push: "$$ROOT" },
-        },
-      },
-    ]);
-    return res.status(200).json(200, splits, "get alldue split to give");
-  } catch (error) {
-    throw new ApiError(400, error.message || "something went wrong");
-  }
-});
-//get all due split to get
-const dueGetSplit = asyncHandler(async (req, res) => {
-  try {
-    const user = req.user._id;
+    if (!friendId) throw new ApiError(400, "Give the friend id");
+
+    const splits = await splitService.getDueToGive(this.getUserId(req), friendId.toString());
+    return res.status(200).json(new ApiResponse(200, "Get all due split to give", splits));
+  });
+
+  dueGetSplit = asyncHandler(async (req: Request, res: Response) => {
     const { friendId } = req.params;
-    if (!friendId) throw new ApiError(400, "give the friend id");
-    const splits = await Split.aggregate([
-      {
-        $match: {
-          splitTo: new mongoose.Types.ObjectId(friendId),
-          splitFrom: new mongoose.Types.ObjectId(user),
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          totalAmount: { $sum: "$amount" },
-          splits: { $push: "$$ROOT" },
-        },
-      },
-    ]);
-    return res.status(200).json(200, splits, "get alldue split to give");
-  } catch (error) {
-    throw new ApiError(400, error.message || "something went wrong");
-  }
-});
+    if (!friendId) throw new ApiError(400, "Give the friend id");
 
-// delete split
-const deleteSplit = asyncHandler(async (req, res) => {
-  try {
-    const user = req.user._id;
-    const splitId = req.params;
-    if (!splitId) throw new ApiError(400, "give the SplitId");
-    const split = await Split.findById(splitId);
-    if (!split.splitFrom.equals(user)) throw new ApiError(400, "access denied");
-    await Split.findByIdAndDelete(splitId);
-    return res.status(200).json(200, "Split deleted");
-  } catch (error) {
-    throw new ApiError(400, error.message || "something went wrong");
-  }
-});
-// paying all due
-const payAllDueDone = asyncHandler(async (req, res) => {
-  const userId = req.user._id;
-  const { friendId } = req.params;
-  if (!friendId) throw new ApiError(400, "give the friendId");
-  const splits = await Split.find({ splitFrom: friendId, splitTo: userId });
-  if (!splits.length) throw new ApiError(400, "split not found");
-  const totalAmount = splits.reduce((sum, split) => sum + split.amount, 0);
-
-  const userFrom = await User.findById(friendId);
-  const userTo = await User.findById(userId);
-
-  let accountFrom = userFrom.primaryAccount;
-  if (!accountFrom) accountFrom = userFrom.cashAccount;
-  const createingExpenseFrom = await Expense.create({
-    amount: totalAmount,
-    description: `splits from ( ${userTo.fullName})`,
-    isGiven: false,
-    account: accountFrom,
-    date: new Date(),
+    const splits = await splitService.getDueToGet(this.getUserId(req), friendId.toString());
+    return res.status(200).json(new ApiResponse(200, "Get all due split to give", splits));
   });
 
-  let accountTo = userTo.primaryAccount;
-  if (!accountTo) accountTo = userTo.cashAccount;
-  const createingExpenseTo = await Expense.create({
-    amount: totalAmount,
-    description: `splits to ( ${userFrom.fullName})`,
-    isGiven: true,
-    account: accouneTo,
-    date: new Date(),
+  deleteSplit = asyncHandler(async (req: Request, res: Response) => {
+    const { splitId } = req.params;
+    if (!splitId) throw new ApiError(400, "Give the SplitId");
+
+    await splitService.deleteSplit(this.getUserId(req), splitId.toString());
+    return res.status(200).json(new ApiResponse(200, "Split deleted"));
   });
 
-  const splitIds = splits.map((s) => s._id);
+  payAllDueDone = asyncHandler(async (req: Request, res: Response) => {
+    const { friendId } = req.params;
+    if (!friendId) throw new ApiError(400, "Give the friendId");
 
-  await Split.deleteMany({ _id: { $in: splitIds } });
-  return res.status(200).json(new ApiResponse(200, "mark one due done"));
-});
-// pay one due
-const payDueDone = asyncHandler(async (req, res) => {
-  const userId = req.user._id;
-  const { splitId } = req.body;
-  if (!splitId) throw new ApiError(400, "give the splitid");
-  const split = await Split.findById(splitId);
-  if (!split) throw new ApiError(400, "split not found");
-  if (!split.splitTo.equals(userId)) throw new ApiError(400, "access denied");
-
-  const userFrom = await User.findById(split.splitFrom);
-  const userTo = await User.findById(userId);
-  let accountFrom = userFrom.primaryAccount;
-  if (!accountFrom) accountFrom = userFrom.cashAccount;
-  const createingExpenseFrom = await Expense.create({
-    amount: split.amount,
-    description: `${split.description} from ( ${userTo.fullName})`,
-    isGiven: false,
-    account: accountFrom,
-    date: new Date(),
+    await splitService.payAllDue(this.getUserId(req), friendId.toString());
+    return res.status(200).json(new ApiResponse(200, "Mark one due done"));
   });
 
-  let accouneTo = userTo.primaryAccount;
-  if (!accouneTo) accouneTo = userTo.cashAccount;
-  const createingExpenseTo = await Expense.create({
-    amount: split.amount,
-    description: `${split.description} to ( ${userFrom.fullName})`,
-    isGiven: true,
-    account: accouneTo,
-    date: new Date(),
+  payDueDone = asyncHandler(async (req: Request, res: Response) => {
+    const { splitId } = req.body as { splitId: string };
+    if (!splitId) throw new ApiError(400, "Give the splitid");
+
+    await splitService.payOneDue(this.getUserId(req), splitId);
+    return res.status(200).json(new ApiResponse(200, "Mark one due done"));
   });
 
-  await Split.findByIdAndDelete(splitId);
-  return res.status(200).json(new ApiResponse(200, "mark one due done"));
-});
-// mark all due done
-const markAllDueDone = asyncHandler(async (req, res) => {
-  const userId = req.user._id;
-  const { friendId } = req.params;
-if (!friendId) throw new ApiError(400, "give the friendId");
-  const splits = await Split.find({ splitTo: friendId, splitFrom: userId });
-  if (!splits.length) throw new ApiError(400, "split not found");
-  const totalAmount = splits.reduce((sum, split) => sum + split.amount, 0);
+  markAllDueDone = asyncHandler(async (req: Request, res: Response) => {
+    const { friendId } = req.params;
+    if (!friendId) throw new ApiError(400, "Give the friendId");
 
-  const userFrom = await User.findById(friendId);
-  const userTo = await User.findById(userId);
-if (!userFrom || !userTo)
-  throw new ApiError(404, "user not found");
-  const createingExpenseFrom = await Expense.create({
-    amount: totalAmount,
-    description: `splits from ( ${userTo.fullName})`,
-    isGiven: false,
-    account: userFrom.cashAccount,
-    date: new Date(),
+    await splitService.markAllDueDone(this.getUserId(req), friendId.toString());
+    return res.status(200).json(new ApiResponse(200, "Mark one due done"));
   });
 
-  const createingExpenseTo = await Expense.create({
-    amount: totalAmount,
-    description: `splits to ( ${userFrom.fullName})`,
-    isGiven: true,
-    account: userTo.cashAccount,
-    date: new Date(),
-  });
+  markDueDone = asyncHandler(async (req: Request, res: Response) => {
+    const { splitId } = req.body as { splitId: string };
+    if (!splitId) throw new ApiError(400, "Give the splitid");
 
-  const splitIds = splits.map((s) => s._id);
-
-  await Split.deleteMany({ _id: { $in: splitIds } });
-  return res.status(200).json(new ApiResponse(200, "mark one due done"));
-});
-// mark one due done
-const markDueDone = asyncHandler(async (req, res) => {
-  const userId = req.user._id;
-  const { splitId } = req.body;
-  if (!splitId) throw new ApiError(400, "give the splitid");
-  const split = await Split.findById(splitId);
-  if (!split) throw new ApiError(400, "split not found");
-  if (!split.splitFrom.equals(userId)) throw new ApiError(400, "access denied");
-  const user = await User.findById(userId);
-  const userTo = await User.findById(split.splitTo);
-  if (!user || !userTo) throw new ApiError(404, "user not found");
-  const createingExpense = await Expense.create({
-    amount: split.amount,
-    description: `${split.description} from ( ${userTo.fullName})`,
-    isGiven: false,
-    account: user.cashAccount,
-    date: new Date(),
+    await splitService.markOneDueDone(this.getUserId(req), splitId);
+    return res.status(200).json(new ApiResponse(200, "Mark one due done"));
   });
+}
 
-  const createingExpenseTo = await Expense.create({
-    amount: split.amount,
-    description: `${split.description} to ( ${user.fullName})`,
-    isGiven: true,
-    account: userTo.cashAccount,
-    date: new Date(),
-  });
-  await Split.findByIdAndDelete(splitId);
-  return res.status(200).json(new ApiResponse(200, "mark one due done"));
-});
-export {
-  createSingleSplit,
-  createSplit,
-  dueGiveSplit,
-  dueGetSplit,
-  deleteSplit,
-  payAllDueDone,
-  payDueDone,
-  markAllDueDone,
-  markDueDone
-};
+export const splitController = new SplitController();
