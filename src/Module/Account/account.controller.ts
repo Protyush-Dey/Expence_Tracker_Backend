@@ -1,205 +1,69 @@
-import { asyncHandler } from "../../utils/AsyncHandler.js";
-import { ApiError } from "../../utils/ApiError.ts/index.js";
-import { ApiResponse } from "../../utils/ApiResponse.js";
-import { Account } from "../Models/account.model.js";
-import { Expense } from "../Expense/expences.model.js";
-import mongoose from "mongoose";
-import { User } from "../User/user.model.js";
-// create a account
-const createAccount = asyncHandler(async (req, res) => {
-  const { account } = req.body;
-  if (!account) throw new ApiError(400, "give a account number");
-  const madeAccount = await Account.create({
-    account,
-    user: req.user._id,
+import { Request, Response } from "express";
+import { asyncHandler } from "../../utils/AsyncHandler";
+import { ApiError } from "../../utils/ApiError";
+import { ApiResponse } from "../../utils/ApiResponse";
+import { BaseController } from "../../Base/Base.controller";
+import { AccountService } from "./account.service";
+
+const accountService = new AccountService();
+
+class AccountController extends BaseController {
+
+
+  // create account
+  createAccount = asyncHandler(async (req: Request, res: Response) => {
+    const { account } = req.body as { account: string };
+    if (!account) throw new ApiError(400, "Give a account number");
+
+    const created = await accountService.createAccount(this.getUserId(req), account);
+    return this.created(res, "Account Created", created);
   });
-  const createdAccount = await Account.findById(madeAccount._id);
-  if (!createdAccount)
-    throw new ApiError(400, "something went wrong while account create");
-  const accountHolder = await User.findById(req.user._id);
-  accountHolder.primaryAccount = createdAccount._id;
-  await accountHolder.save();
-  return res.status(200).json(new ApiResponse(200, "account Created"));
-});
 
-// get all account balance
-const getAllAccountDetails = asyncHandler(async (req, res) => {
-  try {
-    const accounts = await Account.aggregate([
-      {
-        $match: {
-          user: req.user._id,
-        },
-      },
-      {
-        $lookup: {
-          from: "expenses",
-          localField: "_id",
-          foreignField: "account",
-          as: "expenses",
-        },
-      },
-      {
-        $addFields: {
-          balance: {
-            $sum: {
-              $map: {
-                input: "$expenses",
-                as: "exp",
-                in: {
-                  $cond: [
-                    "$$exp.isGiven",
-                    { $multiply: ["$$exp.amount", -1] },
-                    "$$exp.amount",
-                  ],
-                },
-              },
-            },
-          },
-        },
-      },
-      {
-        $project: {
-          account: 1,
-          balance: 1,
-        },
-      },
-    ]);
-    if (accounts.length === 0) throw new ApiError(400, "no account created");
-    return res
-      .status(200)
-      .json(new ApiResponse(200, accounts, "all account data"));
-  } catch (error) {
-    throw new ApiError(401, error?.message || "something went wrong");
-  }
-});
 
-// get expences of a account
+  //get all account and there balance
+  getAllAccountDetails = asyncHandler(async (req: Request, res: Response) => {
+    const accounts = await accountService.getAllAccountDetails(this.getUserId(req));
+    return res.status(200).json(new ApiResponse(200, "All account data", accounts));
+  });
 
-const getMonthExpenseOfAccount = asyncHandler(async (req, res) => {
-  const { accountNo } = req.params;
-  if (!accountNo) throw new ApiError(400, "send the account");
-  const account = await Account.findById(accountNo);
-  if (!account) throw new ApiError(400, "account not found");
-  if (!account.user.equals(req.user._id))
-    throw new ApiError(400, "Access denied");
-  const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
-  const endOfMonth = new Date();
-  endOfMonth.setMonth(endOfMonth.getMonth() + 1);
-  endOfMonth.setDate(0);
-  endOfMonth.setHours(23, 59, 59, 999);
-  const expenses = await Expense.aggregate([
-    {
-      $match: {
-        account: new mongoose.Types.ObjectId(accountNo),
-        date: { $gte: startOfMonth, $lt: endOfMonth },
-      },
-    },
-    {
-      $group: {
-        _id: null,
-        totalSpend: {
-          $sum: {
-            $cond: [{ $eq: ["$isGiven", true] }, "$amount", 0],
-          },
-        },
-        totalGet: {
-          $sum: {
-            $cond: [{ $eq: ["$isGiven", false] }, "$amount", 0],
-          },
-        },
-        expenses: { $push: "$$ROOT" },
-      },
-    },
-  ]);
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      {
-        accountNo,
-        totalSpend: expenses[0]?.totalSpend || 0,
-        totalGet: expenses[0]?.totalGet || 0,
-        expenses: expenses[0]?.expenses || [],
-      },
-      "Monthly expenses fetched",
-    ),
-  );
-});
 
-//get expense of a account with date
-const getExpenseOfAccountByDates = asyncHandler(async (req, res) => {
-  const { accountNo } = req.params;
-  const { startOfMonth, endOfMonth } = req.query;
-  if (!accountNo) throw new ApiError(400, "send the account");
-  if (!startOfMonth || !endOfMonth) throw new ApiError(400, "send the dates");
-  const startDate = new Date(startOfMonth);
-  const endDate = new Date(endOfMonth);
-  const account = await Account.findById(accountNo);
-  if (!account) throw new ApiError(400, "account not found");
-  if (!account.user.equals(req.user._id))
-    throw new ApiError(400, "Access denied");
-  const expenses = await Expense.aggregate([
-    {
-      $match: {
-        account: new mongoose.Types.ObjectId(accountNo),
-        date: { $gte: startDate, $lt: endDate },
-      },
-    },
-    {
-      $group: {
-        _id: null,
-        totalSpend: {
-          $sum: {
-            $cond: [{ $eq: ["$isGiven", true] }, "$amount", 0],
-          },
-        },
-        totalGet: {
-          $sum: {
-            $cond: [{ $eq: ["$isGiven", false] }, "$amount", 0],
-          },
-        },
-        expenses: { $push: "$$ROOT" },
-      },
-    },
-  ]);
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      {
-        accountNo,
-        totalSpend: expenses[0]?.totalSpend || 0,
-        totalGet: expenses[0]?.totalGet || 0,
-        expenses: expenses[0]?.expenses || [],
-      },
-      "Monthly expenses fetched",
-    ),
-  );
-});
+  // get expense with current month
+  getMonthExpenseOfAccount = asyncHandler(async (req: Request, res: Response) => {
+    const { accountNo } = req.params;
+    if (!accountNo) throw new ApiError(400, "Send the account");
 
-//delete account
-const deleteAccount = asyncHandler(async (req, res) => {
-  const { accountNo } = req.params;
-  if (!accountNo) throw new ApiError(400, "send the account");
-  const account = await Account.findById(accountNo);
-  if (!account) throw new ApiError(400, "account not found");
-  if (!account.user.equals(req.user._id))
-    throw new ApiError(400, "Access denied");
-  const user =await User.findById(req.user._id)
-  if(user.cashAccount.equals(accountNo) || user.primaryAccount.equals(accountNo)) throw new ApiError(401 ,"you camtnot delete primary or cash account")
-  const deleteExpenses = await Expense.deleteMany({ account: accountNo });
-  if (!deleteExpenses) throw new ApiError(400, "expenses are not deleted");
-  const deleteaccount = await Account.findByIdAndDelete(accountNo);
-  if (!deleteaccount) throw new ApiError(400, "expenses are not deleted");
-  return res
-    .status(200)
-    .json(new ApiResponse(200, "account deleted successfully"));
-});
-export {
-  createAccount,
-  getAllAccountDetails,
-  getMonthExpenseOfAccount,
-  getExpenseOfAccountByDates,
-  deleteAccount,
-};
+    const data = await accountService.getExpenseOfAccountByDates(this.getUserId(req), accountNo.toString());
+    return res.status(200).json(new ApiResponse(200, "Monthly expenses fetched", data));
+  });
+
+
+
+  
+  // get expense with dates
+  getExpenseOfAccountByDates = asyncHandler(async (req: Request, res: Response) => {
+    const { accountNo } = req.params;
+    const { startOfMonth, endOfMonth } = req.query as {
+      startOfMonth?: string;
+      endOfMonth?: string;
+    };
+    if (!accountNo) throw new ApiError(400, "Send the account");
+    if (!startOfMonth || !endOfMonth) throw new ApiError(400, "Send the dates");
+
+    const data = await accountService.getExpenseOfAccountByDates(
+      this.getUserId(req), accountNo.toString(), startOfMonth, endOfMonth
+    );
+    return res.status(200).json(new ApiResponse(200, "Monthly expenses fetched", data));
+  });
+
+
+  //delete account
+  deleteAccount = asyncHandler(async (req: Request, res: Response) => {
+    const { accountNo } = req.params;
+    if (!accountNo) throw new ApiError(400, "Send the account");
+
+    await accountService.deleteAccount(this.getUserId(req), accountNo.toString());
+    return res.status(200).json(new ApiResponse(200, "Account deleted successfully"));
+  });
+}
+
+export const accountController = new AccountController();

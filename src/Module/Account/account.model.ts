@@ -19,7 +19,7 @@ export class Account extends BaseModel {
   public account!: string;
 
   @prop({
-    ref: () => User,
+    ref: () => "User",
     type: () => mongoose.Schema.Types.ObjectId,
   })
   public user?: Ref<User>;
