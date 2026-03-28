@@ -11,7 +11,7 @@ import { User } from "../User/user.model";
 @modelOptions({
   schemaOptions: {
     timestamps: true,
-    collection: "friend_requests",
+    collection: "friendRequests",
   },
 })
 export class FriendRequest extends BaseModel {
