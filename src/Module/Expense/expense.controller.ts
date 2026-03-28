@@ -8,7 +8,9 @@ import { ExpenseService } from "./expense.service";
 const expenseService = new ExpenseService();
 
 class ExpenseController extends BaseController {
-  // ─── Create Expense ────────────────────────────────────────────────────────
+
+
+  // Create Expense
   createExpense = asyncHandler(async (req: Request, res: Response) => {
     const { amount, description, isGiven, account, date } = req.body as {
       amount: number;
@@ -31,7 +33,9 @@ class ExpenseController extends BaseController {
       .json(new ApiResponse(200, "Expense created successfully", createdExpense));
   });
 
-  // ─── Delete Expense ────────────────────────────────────────────────────────
+  
+
+  // Delete Expense
   deleteExpense = asyncHandler(async (req: Request, res: Response) => {
     const { expenseId } = req.body as { expenseId: string };
     if (!expenseId) throw new ApiError(400, "Give the expenseId");

@@ -63,21 +63,6 @@ export class AccountService extends BaseService<Account> {
 
 
 
-//   async getMonthExpenseOfAccount(userId: string, accountNo: string) {
-//     await this._verifyOwnership(userId, accountNo);
-
-//     const startOfMonth = new Date();
-//     startOfMonth.setDate(1);
-//     startOfMonth.setHours(0, 0, 0, 0);
-//     const endOfMonth = new Date();
-//     endOfMonth.setMonth(endOfMonth.getMonth() + 1);
-//     endOfMonth.setDate(0);
-//     endOfMonth.setHours(23, 59, 59, 999);
-
-//     return this._aggregateExpenses(accountNo, startOfMonth, endOfMonth);
-//   }
-
-
 // get account expense by date
   async getExpenseOfAccountByDates(
     userId: string,
@@ -136,6 +121,8 @@ export class AccountService extends BaseService<Account> {
     return account;
   }
 
+
+  // aggregate func
   private async _aggregateExpenses(accountNo: string, startDate: Date, endDate: Date) {
     const expenses = await ExpenseModel.aggregate([
       {

@@ -1,4 +1,3 @@
-import { modelOptions, prop } from "@typegoose/typegoose";
 import mongoose from "mongoose";
 
 export abstract class BaseModel {

@@ -26,6 +26,7 @@ export class SplitService extends BaseService<Split> {
     return split;
   }
 
+  // make a group split
   async createBulkSplits(
     userId: string,
     description: string,
@@ -40,9 +41,8 @@ export class SplitService extends BaseService<Split> {
     await SplitModel.insertMany(splits);
   }
 
-  // ─── Read ─────────────────────────────────────────────────────────────────
 
-  /** Splits that friend created and assigned to me — I owe them */
+  // gat all splits to pay
   async getDueToGive(userId: string, friendId: string) {
     return SplitModel.aggregate([
       {
@@ -61,7 +61,8 @@ export class SplitService extends BaseService<Split> {
     ]);
   }
 
-  /** Splits that I created and assigned to friend — they owe me */
+
+  // gat all splits tobe paid
   async getDueToGet(userId: string, friendId: string) {
     return SplitModel.aggregate([
       {
@@ -80,8 +81,8 @@ export class SplitService extends BaseService<Split> {
     ]);
   }
 
-  // ─── Delete ───────────────────────────────────────────────────────────────
 
+  // detlete split from split from
   async deleteSplit(userId: string, splitId: string) {
     const split = await SplitModel.findById(splitId);
     if (!split) throw new ApiError(404, "Split not found");
@@ -89,8 +90,9 @@ export class SplitService extends BaseService<Split> {
     await SplitModel.findByIdAndDelete(splitId);
   }
 
-  // ─── Pay All Due — friend pays back all they owe me ───────────────────────
 
+
+  // pay all due
   async payAllDue(userId: string, friendId: string) {
     const splits = await SplitModel.find({
       splitFrom: new mongoose.Types.ObjectId(friendId),
@@ -124,8 +126,8 @@ export class SplitService extends BaseService<Split> {
     await SplitModel.deleteMany({ _id: { $in: splits.map((s) => s._id) } });
   }
 
-  // ─── Pay One Due — friend pays back one split they owe me ─────────────────
 
+  // pay all due
   async payOneDue(userId: string, splitId: string) {
     const split = await SplitModel.findById(splitId);
     if (!split) throw new ApiError(404, "Split not found");
@@ -160,8 +162,8 @@ export class SplitService extends BaseService<Split> {
     await SplitModel.findByIdAndDelete(splitId);
   }
 
-  // ─── Mark All Due Done — I declare all splits I assigned are settled ───────
 
+  //mark pay all due
   async markAllDueDone(userId: string, friendId: string) {
     const splits = await SplitModel.find({
       splitFrom: new mongoose.Types.ObjectId(userId),
@@ -192,14 +194,13 @@ export class SplitService extends BaseService<Split> {
     await SplitModel.deleteMany({ _id: { $in: splits.map((s) => s._id) } });
   }
 
-  // ─── Mark One Due Done — I declare one split I assigned is settled ─────────
+  
 
+  //mark pay one
   async markOneDueDone(userId: string, splitId: string) {
     const split = await SplitModel.findById(splitId);
     if (!split) throw new ApiError(404, "Split not found");
-    // userId must be the splitFrom (the one who created the split)
     this.assertOwnership(String(split.splitFrom), userId);
-
     const [userTo, user] = await this._resolveUsers(
       String(split.splitTo),
       userId
@@ -225,7 +226,7 @@ export class SplitService extends BaseService<Split> {
     await SplitModel.findByIdAndDelete(splitId);
   }
 
-  // ─── Private Helpers ──────────────────────────────────────────────────────
+  //Private Helpers 
 
   private async _resolveUsers(idA: string, idB: string) {
     const [userA, userB] = await Promise.all([

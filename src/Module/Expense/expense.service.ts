@@ -9,7 +9,7 @@ export class ExpenseService extends BaseService<Expense> {
     super(ExpenseModel);
   }
 
-  // ─── Create Expense ────────────────────────────────────────────────────────
+  // Create Expense
 
   async createExpense(
     userId: string,
@@ -41,7 +41,7 @@ export class ExpenseService extends BaseService<Expense> {
     return createdExpense;
   }
 
-  // ─── Delete Expense ────────────────────────────────────────────────────────
+  // Delete Expense
 
   async deleteExpense(userId: string, expenseId: string) {
     const expense = await ExpenseModel.findById(expenseId);

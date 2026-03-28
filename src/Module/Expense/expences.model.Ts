@@ -11,13 +11,13 @@ import { Account } from "../Account/account.model";
 })
 export class Expense extends BaseModel {
   @prop({ required: true, type: () => Number })
-  public amount!: number; // fixed: was `string` in original
+  public amount!: number; 
 
   @prop({ required: true, type: () => String })
   public description!: string;
 
   @prop({ required: true, type: () => Boolean })
-  public isGiven!: boolean; // fixed: was `sGiven` in original
+  public isGiven!: boolean; 
 
   @prop({ required: true, type: () => Date })
   public date!: Date;
