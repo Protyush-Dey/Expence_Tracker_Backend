@@ -1,9 +1,12 @@
 import jwt from "jsonwebtoken";
 import { ApiError } from "../../utils/ApiError";
 import { BaseService } from "../../Base/Base.service";
+console.log("user");
 import { User, UserModel } from "./user.model";
+console.log("account");
 import { AccountModel } from "../Account/account.model";
 import { generateOTP } from "../../utils/otp"; // plug in your OTP util
+console.log("exp");
 import { ExpenseModel } from "../Expense/expences.model";
 import mongoose from "mongoose";
 
