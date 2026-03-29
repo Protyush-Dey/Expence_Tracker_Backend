@@ -18,7 +18,7 @@
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^8.23.0",
+    "mongoose": "~8.21.0",
     "mongoose-aggregate-paginate-v2": "^1.1.4",
     "nodemailer": "^8.0.2",
     "resend": "^6.9.3"
