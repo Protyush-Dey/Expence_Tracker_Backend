@@ -27,6 +27,7 @@ initializeModules(app);
 
 // connect mongodb
 const PORT = process.env.PORT || 8000
+console.log(PORT);
 connectDb().
 then(()=>{
   server.listen(PORT, ()=>{
