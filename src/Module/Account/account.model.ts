@@ -6,7 +6,6 @@ import {
 } from "@typegoose/typegoose";
 import mongoose from "mongoose";
 import { BaseModel } from "../../Base/Base.model";
-import { User } from "../User/user.model";
 
 @modelOptions({
   schemaOptions: {
@@ -19,10 +18,10 @@ export class Account extends BaseModel {
   public account!: string;
 
   @prop({
-    ref: () => "User",
+    ref: () => "User",          // string reference instead of importing User
     type: () => mongoose.Schema.Types.ObjectId,
   })
-  public user?: Ref<User>;
+  public user?: Ref<any>;       // use Ref<any> to avoid importing User
 }
 
 export const AccountModel = getModelForClass(Account);
