@@ -51,11 +51,11 @@ export class User extends BaseModel {
   })
   public email!: string;
 
-  @prop({ ref: () => Account, type: () => mongoose.Schema.Types.ObjectId })
-  public cashAccount?: Ref<Account>;
+  @prop({ ref: "Account", type: () => mongoose.Schema.Types.ObjectId })
+public cashAccount?: Ref<any>;
 
-  @prop({ ref: () => Account, type: () => mongoose.Schema.Types.ObjectId })
-  public primaryAccount?: Ref<Account>;
+@prop({ ref: "Account", type: () => mongoose.Schema.Types.ObjectId })
+public primaryAccount?: Ref<any>;
 
   @prop({ required: true, type: () => String })
   public password!: string;

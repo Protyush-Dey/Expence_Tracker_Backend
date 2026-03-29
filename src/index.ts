@@ -27,7 +27,7 @@ app.use(cookieParser());
 const server = http.createServer(app);
 initializeModules(app);
 
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT || 4000;
 console.log("==> Step 5: about to connect DB, PORT =", PORT);
 
 connectDb()
