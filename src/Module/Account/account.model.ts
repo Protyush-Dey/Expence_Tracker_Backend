@@ -18,10 +18,10 @@ export class Account extends BaseModel {
   public account!: string;
 
   @prop({
-    ref: () => "User",          // string reference instead of importing User
+    ref: () => "User",
     type: () => mongoose.Schema.Types.ObjectId,
   })
-  public user?: Ref<any>;       // use Ref<any> to avoid importing User
+  public user?: Ref<any>;
 }
 
 export const AccountModel = getModelForClass(Account);
