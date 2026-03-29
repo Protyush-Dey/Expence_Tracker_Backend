@@ -1,4 +1,5 @@
 import { Router } from "express";
+console.log("==> user.controller loaded");
 import { userController } from "./user.controller";
 import { verifyJwtToken, verifyOtpJwtToken } from "../../middleware/Auth.middleware";
 
