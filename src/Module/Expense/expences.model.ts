@@ -1,7 +1,6 @@
 import { modelOptions, prop, Ref, getModelForClass } from "@typegoose/typegoose";
 import mongoose from "mongoose";
 import { BaseModel } from "../../Base/Base.model";
-import { Account } from "../Account/account.model";
 
 @modelOptions({
   schemaOptions: {
@@ -23,10 +22,10 @@ export class Expense extends BaseModel {
   public date!: Date;
 
   @prop({
-    ref: () => Account,
+    ref: "Account",  // ✅ FIXED
     type: () => mongoose.Schema.Types.ObjectId,
   })
-  public account?: Ref<Account>;
+  public account?: Ref<any>; // ✅ avoid importing Account
 }
 
 export const ExpenseModel = getModelForClass(Expense);

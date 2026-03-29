@@ -6,7 +6,6 @@ import {
 } from "@typegoose/typegoose";
 import mongoose from "mongoose";
 import { BaseModel } from "../../Base/Base.model";
-import { User } from "../User/user.model";
 
 @modelOptions({
   schemaOptions: {
@@ -16,18 +15,18 @@ import { User } from "../User/user.model";
 })
 export class FriendRequest extends BaseModel {
   @prop({
-    ref: () => User,
+    ref: () => "User",
     type: () => mongoose.Schema.Types.ObjectId,
     required: true,
   })
-  public requestTo!: Ref<User>;
+  public requestTo!: Ref<any>;
 
   @prop({
-    ref: () => User,
+    ref: () => "User",
     type: () => mongoose.Schema.Types.ObjectId,
     required: true,
   })
-  public requestFrom!: Ref<User>;
+  public requestFrom!: Ref<any>;
 }
 
 export const FriendRequestModel = getModelForClass(FriendRequest);

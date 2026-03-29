@@ -6,7 +6,6 @@ import {
 } from "@typegoose/typegoose";
 import mongoose from "mongoose";
 import { BaseModel } from "../../Base/Base.model";
-import { User } from "../User/user.model";
 
 @modelOptions({
   schemaOptions: {
@@ -16,18 +15,18 @@ import { User } from "../User/user.model";
 })
 export class Split extends BaseModel {
   @prop({
-    ref: () => User,
+    ref: () => "User",
     type: () => mongoose.Schema.Types.ObjectId,
     required: true,
   })
-  public splitFrom!: Ref<User>;
+  public splitFrom!: Ref<any>;
 
   @prop({
-    ref: () => User,
+    ref: () => "User",
     type: () => mongoose.Schema.Types.ObjectId,
     required: true,
   })
-  public splitTo!: Ref<User>;
+  public splitTo!: Ref<any>;
 
   @prop({ required: true, type: () => Number })
   public amount!: number;
