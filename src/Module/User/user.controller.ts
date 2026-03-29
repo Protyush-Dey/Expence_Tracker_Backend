@@ -1,8 +1,13 @@
 import { Request, Response } from "express";
+console.log("==> hand loaded");
 import { asyncHandler } from "../../utils/AsyncHandler";
+console.log("==> err loaded");
 import { ApiError } from "../../utils/ApiError";
+console.log("==> res loaded");
 import { ApiResponse } from "../../utils/ApiResponse";
+console.log("==> basec loaded");
 import { BaseController } from "../../Base/Base.controller";
+console.log("==> user.service loaded");
 import { UserService } from "./user.service";
 
 const userService = new UserService();
