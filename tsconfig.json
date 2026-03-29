@@ -6,10 +6,16 @@
     "esModuleInterop": true,
     "strict": false,
     "skipLibCheck": true,
+
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
+
+    "rootDir": "./src",
     "outDir": "./dist",
-    "rootDir": "./src"
+
+    "resolveJsonModule": true,
+    "sourceMap": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["node_modules"]
 }

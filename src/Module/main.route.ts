@@ -1,6 +1,6 @@
 import { Application } from "express";
 console.log("==> importing userRouter");
-import userRouter from "./User/user.route";
+// import userRouter from "./User/user.route";
 console.log("==> importing expenseRouter");
 import expenseRouter from "./Expense/expense.route";
 console.log("==> importing splitRouter");
@@ -9,6 +9,7 @@ console.log("==> importing friendRouter");
 import friendRouter from "./Friend/friend.route";
 console.log("==> importing accountRouter");
 import accountRouter from "./Account/account.route";
+import userRouter from "./User/user.route";
 console.log("==> all routers imported");
 
 export default function initializeModules(app: Application): void {
