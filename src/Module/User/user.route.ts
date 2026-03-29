@@ -1,6 +1,6 @@
 import { Router } from "express";
-console.log("==> user.controller loaded");
 import { userController } from "./user.controller";
+console.log("==> user.controller loaded");
 import { verifyJwtToken, verifyOtpJwtToken } from "../../middleware/Auth.middleware";
 
 
