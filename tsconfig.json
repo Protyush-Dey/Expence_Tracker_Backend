@@ -1,8 +1,9 @@
 {
   "compilerOptions": {
-    "module": "CommonJS",
+    "module": "Node16",
     "target": "ES2020",
-    "moduleResolution": "node",
+    "moduleResolution": "Node16",
+
     "esModuleInterop": true,
     "strict": false,
     "skipLibCheck": true,
@@ -16,7 +17,7 @@
     "resolveJsonModule": true,
     "sourceMap": true,
 
-    "types": ["node"]   // 🔥 IMPORTANT FIX
+    "types": ["node"]
   },
   "include": ["src"],
   "exclude": ["node_modules"]
