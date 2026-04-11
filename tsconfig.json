@@ -14,7 +14,9 @@
     "outDir": "./dist",
 
     "resolveJsonModule": true,
-    "sourceMap": true
+    "sourceMap": true,
+
+    "types": ["node"]   // 🔥 IMPORTANT FIX
   },
   "include": ["src"],
   "exclude": ["node_modules"]

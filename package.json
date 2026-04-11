@@ -3,12 +3,11 @@
   "version": "1.0.0",
   "type": "commonjs",
   "main": "index.ts",
-"scripts": {
-  "build": "tsc",
-  "start": "node dist/index.js",
-  
-  "dev": "nodemon --exec ts-node src/index.ts"
-},
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "nodemon --exec ts-node src/index.ts"
+  },
   "author": "Protyush",
   "license": "ISC",
   "description": "",
@@ -32,7 +31,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^25.5.0",
+    "@types/node": "^25.6.0",
     "nodemon": "^3.1.11",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
