@@ -106,7 +106,13 @@ export class UserService extends BaseService<User> {
     await UserModel.findByIdAndUpdate(userId, { $unset: { refreshToken: 1 } });
   }
 
+  //me
+ async me(userId: string) {
+    const user = await UserModel.findById(userId).select("id fullName userName email");
+    if(!user) throw new ApiError(404 , "user not found");
+    return user;
 
+  }
     // reset refresh token
   async resetRefreshToken(incomingRefToken: string) {
     const secret = process.env.REFRESH_TOKEN_SECRET;

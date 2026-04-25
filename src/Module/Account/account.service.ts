@@ -25,8 +25,22 @@ export class AccountService extends BaseService<Account> {
 
 //   //get account and balance
   async getAllAccountDetails(userId: string) {
+    const user = await UserModel.findById(userId).select("cashAccount primaryAccount");
     const accounts = await AccountModel.aggregate([
       { $match: { user: new mongoose.Types.ObjectId(userId) } },
+      {
+    $addFields: {
+      type: {
+        $switch: {
+          branches: [
+            { case: { $eq: ["$_id", user?.cashAccount] }, then: "cash" },
+            { case: { $eq: ["$_id", user?.primaryAccount] }, then: "primary" },
+          ],
+          default: "normal",
+        },
+      },
+    },
+  },
       {
         $lookup: {
           from: "expenses",
@@ -54,7 +68,7 @@ export class AccountService extends BaseService<Account> {
           },
         },
       },
-      { $project: { account: 1, balance: 1 } },
+      { $project: { account: 1, balance: 1 , type:1} },
     ]);
 
     if (!accounts.length) throw new ApiError(404, "No accounts found");

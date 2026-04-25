@@ -60,6 +60,17 @@ class UserController extends BaseController {
       );
   });
 
+
+  //me
+
+  me = asyncHandler(async(req:Request, res:Response)=>{
+    const user = await userService.me(this.getUserId(req));
+    return res
+      .status(200)
+      .json(new ApiResponse(200, "Logged out successfully" ,user));
+  })
+
+
   //logout user
   logoutUser = asyncHandler(async (req: Request, res: Response) => {
     await userService.logoutUser(this.getUserId(req));

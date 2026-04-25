@@ -40,7 +40,7 @@ const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
 app.use(errorHandler); 
 
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 3000;
 console.log("==> Step 5: about to connect DB, PORT =", PORT);
 
 connectDb()
