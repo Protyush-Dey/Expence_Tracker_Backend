@@ -5,7 +5,7 @@ console.log("==> Step 1: dotenv loaded");
 console.log("==> MONGO_URL:", process.env.MONGO_URL ? "Found ✅" : "Missing ❌");
 console.log("==> PORT:", process.env.PORT);
 
-import express from "express";
+import express, { ErrorRequestHandler } from "express";
 console.log("==> Step 2: express loaded");
 
 import cors from "cors";
@@ -26,6 +26,19 @@ app.use(cookieParser());
 
 const server = http.createServer(app);
 initializeModules(app);
+
+
+const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
+  const statusCode = err.statusCode || 500;
+  res.status(statusCode).json({
+    success: false,
+    message: err.message || "Something went wrong",
+    errors: err.errors || [],
+  });
+};
+
+app.use(errorHandler); 
+
 
 const PORT = process.env.PORT || 4000;
 console.log("==> Step 5: about to connect DB, PORT =", PORT);
