@@ -1,13 +1,8 @@
 import { Request, Response } from "express";
-console.log("==> hand loaded");
 import { asyncHandler } from "../../utils/AsyncHandler";
-console.log("==> err loaded");
 import { ApiError } from "../../utils/ApiError";
-console.log("==> res loaded");
 import { ApiResponse } from "../../utils/ApiResponse";
-console.log("==> basec loaded");
 import { BaseController } from "../../Base/Base.controller";
-console.log("==> user.service loaded");
 import { UserService } from "./user.service";
 
 const userService = new UserService();
@@ -56,22 +51,19 @@ class UserController extends BaseController {
       .json(
         new ApiResponse(200, "Logged in successfully", {
           user: loginData,
-        }),
+        })
       );
   });
 
-
-  //me
-
-  me = asyncHandler(async(req:Request, res:Response)=>{
+  // me
+  me = asyncHandler(async (req: Request, res: Response) => {
     const user = await userService.me(this.getUserId(req));
     return res
       .status(200)
-      .json(new ApiResponse(200, "Logged out successfully" ,user));
-  })
+      .json(new ApiResponse(200, "User fetched successfully", user));
+  });
 
-
-  //logout user
+  // logout user
   logoutUser = asyncHandler(async (req: Request, res: Response) => {
     await userService.logoutUser(this.getUserId(req));
     return res
@@ -98,7 +90,7 @@ class UserController extends BaseController {
       .json(new ApiResponse(200, "Token updated successfully"));
   });
 
-  //forgot password
+  // forgot password
   forgotPassword = asyncHandler(async (req: Request, res: Response) => {
     const { email } = req.body as { email: string };
     if (!email?.trim()) throw new ApiError(400, "Give the fields");
@@ -107,7 +99,7 @@ class UserController extends BaseController {
     return res.status(200).json(new ApiResponse(200, "OTP generated", { otp }));
   });
 
-  //verify otp for password
+  // verify otp for password
   verifyPasswordChangeOtp = asyncHandler(
     async (req: Request, res: Response) => {
       const { email, otp } = req.body as { email: string; otp: string };
@@ -118,7 +110,7 @@ class UserController extends BaseController {
         .status(200)
         .cookie("OtpToken", otpToken, this.cookieOptions)
         .json(new ApiResponse(200, "OTP verified"));
-    },
+    }
   );
 
   // update password
@@ -133,7 +125,7 @@ class UserController extends BaseController {
       .json(new ApiResponse(200, "Password changed"));
   });
 
-  // find a friend
+  // find a friend / user
   findUser = asyncHandler(async (req: Request, res: Response) => {
     const { loginInfo } = req.params;
     if (!loginInfo?.toString().trim())
@@ -146,7 +138,7 @@ class UserController extends BaseController {
   // get expense with the same month
   getMonthExpenseOfUser = asyncHandler(async (req: Request, res: Response) => {
     const expenses = await userService.getExpenseOfUserByDates(
-      this.getUserId(req),
+      this.getUserId(req)
     );
     return res
       .status(200)
@@ -166,12 +158,12 @@ class UserController extends BaseController {
       const expenses = await userService.getExpenseOfUserByDates(
         this.getUserId(req),
         startOfMonth,
-        endOfMonth,
+        endOfMonth
       );
       return res
         .status(200)
         .json(new ApiResponse(200, "Get expenses of dates", expenses));
-    },
+    }
   );
 
   // change primary account
@@ -179,7 +171,7 @@ class UserController extends BaseController {
     const { accountId } = req.params;
     await userService.changePrimaryAccount(
       this.getUserId(req),
-      accountId.toString(),
+      accountId.toString()
     );
     return res
       .status(200)

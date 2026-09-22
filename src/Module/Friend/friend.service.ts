@@ -1,159 +1,194 @@
-import mongoose from "mongoose";
 import { ApiError } from "../../utils/ApiError";
-import { BaseService } from "../../Base/Base.service";
-import { Friend, FriendModel } from "./friends.model";
-import { FriendRequestModel } from "./friendRequest.model";
-import { UserModel } from "../User/user.model";
+import { prisma } from "../../config/prisma";
 
-export class FriendService extends BaseService<Friend> {
-  constructor() {
-    super(FriendModel);
-  }
-
-
-  //make request
+export class FriendService {
+  // make request
   async makeRequest(userId: string, requestTo: string) {
-    if (requestTo == userId) throw new ApiError(400, "Cannot send request to yourself");
+    if (requestTo === userId)
+      throw new ApiError(400, "Cannot send request to yourself");
 
-    const target = await UserModel.findById(requestTo);
+    const target = await prisma.user.findUnique({
+      where: { id: requestTo },
+    });
     if (!target) throw new ApiError(404, "User not found");
-    const alreadyExists = await FriendRequestModel.exists({
-      $or: [
-        { requestFrom: userId, requestTo },
-        { requestFrom: requestTo, requestTo: userId },
-      ],
+
+    const areFriends = await prisma.friend.findFirst({
+      where: {
+        OR: [
+          { userAId: userId, userBId: requestTo },
+          { userAId: requestTo, userBId: userId },
+        ],
+      },
+    });
+    if (areFriends) throw new ApiError(409, "Already friends");
+
+    const alreadyExists = await prisma.friendRequest.findFirst({
+      where: {
+        OR: [
+          { requestFromId: userId, requestToId: requestTo },
+          { requestFromId: requestTo, requestToId: userId },
+        ],
+      },
     });
     if (alreadyExists) throw new ApiError(409, "Friend request already exists");
 
-    return FriendRequestModel.create({
-      requestTo: new mongoose.Types.ObjectId(requestTo),
-      requestFrom: new mongoose.Types.ObjectId(userId),
+    return prisma.friendRequest.create({
+      data: {
+        requestFromId: userId,
+        requestToId: requestTo,
+      },
     });
   }
 
-
-  //reject request
+  // reject request
   async rejectRequest(userId: string, requestId: string) {
-    const request = await FriendRequestModel.findById(requestId);
+    const request = await prisma.friendRequest.findUnique({
+      where: { id: requestId },
+    });
     if (!request) throw new ApiError(404, "Request not found");
-    this.assertOwnership(String(request.requestTo), userId);
-    await FriendRequestModel.findByIdAndDelete(requestId);
+    this.assertOwnership(request.requestToId, userId);
+    await prisma.friendRequest.delete({
+      where: { id: requestId },
+    });
   }
 
-
-    // delete request
+  // delete request
   async deleteRequest(userId: string, requestId: string) {
-    const request = await FriendRequestModel.findById(requestId);
+    const request = await prisma.friendRequest.findUnique({
+      where: { id: requestId },
+    });
     if (!request) throw new ApiError(404, "Request not found");
     // Only the sender can delete their own request
-    this.assertOwnership(String(request.requestFrom), userId);
-    await FriendRequestModel.findByIdAndDelete(requestId);
-  }
-
-
-   // get all friend Recieved request 
-  async getAllRequestsReceived(userId: string) {
-    return FriendRequestModel.aggregate([
-      { $match: { requestTo: new mongoose.Types.ObjectId(userId) } },
-      {
-        $lookup: {
-          from: "users",
-          localField: "requestFrom",
-          foreignField: "_id",
-          as: "sender",
-        },
-      },
-      { $unwind: "$sender" },
-      {
-        $project: {
-          _id: 1,
-          createdAt: 1,
-          senderName: "$sender.userName",
-          senderFullName: "$sender.fullName",
-        },
-      },
-    ]);
-  }
-
-
-
-  // get all friend sened request
-  async getAllRequestsSent(userId: string) {
-    return FriendRequestModel.aggregate([
-      { $match: { requestFrom: new mongoose.Types.ObjectId(userId) } },
-      {
-        $lookup: {
-          from: "users",
-          localField: "requestTo",
-          foreignField: "_id",
-          as: "receiver",
-        },
-      },
-      { $unwind: "$receiver" },
-      {
-        $project: {
-          _id: 1,
-          createdAt: 1,
-          receiverName: "$receiver.userName",
-          receiverEmail: "$receiver.email",
-          receiverFullName: "$receiver.fullName",
-        },
-      },
-    ]);
-  }
-
-  async acceptRequest(userId: string, requestId: string) {
-    const request = await FriendRequestModel.findById(requestId);
-    if (!request) throw new ApiError(404, "Request not found");
-    // Only the recipient can accept
-    this.assertOwnership(String(request.requestTo), userId);
-
-    const friend = await FriendModel.create({
-      users: [
-        new mongoose.Types.ObjectId(userId),
-        new mongoose.Types.ObjectId(String(request.requestFrom)),
-      ],
+    this.assertOwnership(request.requestFromId, userId);
+    await prisma.friendRequest.delete({
+      where: { id: requestId },
     });
-
-    await FriendRequestModel.findByIdAndDelete(requestId);
-    return friend;
   }
 
-  async getAllFriends(userId: string) {
-    return FriendModel.aggregate([
-      { $match: { users: new mongoose.Types.ObjectId(userId) } },
-      {
-        $project: {
-          friendId: {
-            $arrayElemAt: [
-              {
-                $setDifference: [
-                  "$users",
-                  [new mongoose.Types.ObjectId(userId)],
-                ],
-              },
-              0,
-            ],
+  // get all friend Received request
+  async getAllRequestsReceived(userId: string) {
+    const requests = await prisma.friendRequest.findMany({
+      where: { requestToId: userId },
+      include: {
+        requestFrom: {
+          select: {
+            id: true,
+            userName: true,
+            fullName: true,
+            email: true,
           },
         },
       },
-      {
-        $lookup: {
-          from: "users",
-          localField: "friendId",
-          foreignField: "_id",
-          as: "friend",
+      orderBy: { createdAt: "desc" },
+    });
+
+    return requests.map((r) => ({
+      _id: r.id,
+      id: r.id,
+      createdAt: r.createdAt,
+      senderName: r.requestFrom.userName,
+      senderFullName: r.requestFrom.fullName,
+      senderEmail: r.requestFrom.email,
+    }));
+  }
+
+  // get all friend sent request
+  async getAllRequestsSent(userId: string) {
+    const requests = await prisma.friendRequest.findMany({
+      where: { requestFromId: userId },
+      include: {
+        requestTo: {
+          select: {
+            id: true,
+            userName: true,
+            fullName: true,
+            email: true,
+          },
         },
       },
-      { $unwind: "$friend" },
-      {
-        $project: {
-          _id: "$friend._id",
-          email: "$friend.email",
-          userName: "$friend.userName",
-          fullName: "$friend.fullName",
+      orderBy: { createdAt: "desc" },
+    });
+
+    return requests.map((r) => ({
+      _id: r.id,
+      id: r.id,
+      createdAt: r.createdAt,
+      receiverName: r.requestTo.userName,
+      receiverEmail: r.requestTo.email,
+      receiverFullName: r.requestTo.fullName,
+    }));
+  }
+
+  // accept request
+  async acceptRequest(userId: string, requestId: string) {
+    const request = await prisma.friendRequest.findUnique({
+      where: { id: requestId },
+    });
+    if (!request) throw new ApiError(404, "Request not found");
+    // Only the recipient can accept
+    this.assertOwnership(request.requestToId, userId);
+
+    const [userAId, userBId] = [userId, request.requestFromId].sort();
+
+    const friend = await prisma.$transaction(async (tx) => {
+      const created = await tx.friend.create({
+        data: {
+          userAId,
+          userBId,
+        },
+      });
+
+      await tx.friendRequest.delete({
+        where: { id: requestId },
+      });
+
+      return created;
+    });
+
+    return friend;
+  }
+
+  // get all friends
+  async getAllFriends(userId: string) {
+    const friendships = await prisma.friend.findMany({
+      where: {
+        OR: [{ userAId: userId }, { userBId: userId }],
+      },
+      include: {
+        userA: {
+          select: {
+            id: true,
+            email: true,
+            userName: true,
+            fullName: true,
+          },
+        },
+        userB: {
+          select: {
+            id: true,
+            email: true,
+            userName: true,
+            fullName: true,
+          },
         },
       },
-    ]);
+    });
+
+    return friendships.map((f) => {
+      const friend = f.userAId === userId ? f.userB : f.userA;
+      return {
+        _id: friend.id,
+        id: friend.id,
+        email: friend.email,
+        userName: friend.userName,
+        fullName: friend.fullName,
+      };
+    });
+  }
+
+  private assertOwnership(ownerId: string, resourceOwnerId: string): void {
+    if (String(ownerId) !== String(resourceOwnerId)) {
+      throw new ApiError(403, "Access denied");
+    }
   }
 }

@@ -8,9 +8,7 @@ import { SplitService } from "./split.service";
 const splitService = new SplitService();
 
 class SplitController extends BaseController {
-
-
-  //create split to one friend 
+  // create split to one friend
   createSingleSplit = asyncHandler(async (req: Request, res: Response) => {
     const { splitTo, amount, description } = req.body as {
       splitTo: string;
@@ -26,7 +24,9 @@ class SplitController extends BaseController {
       amount,
       description,
     });
-    return res.status(200).json(new ApiResponse(200, "Split made successfully", split));
+    return res
+      .status(200)
+      .json(new ApiResponse(200, "Split made successfully", split));
   });
 
   // make a group split
@@ -38,32 +38,45 @@ class SplitController extends BaseController {
     if (!description?.trim() || !details?.length)
       throw new ApiError(400, "Give all fields");
 
-    await splitService.createBulkSplits(this.getUserId(req), description, details);
-    return res.status(200).json(new ApiResponse(200, "Split made successfully"));
+    await splitService.createBulkSplits(
+      this.getUserId(req),
+      description,
+      details
+    );
+    return res
+      .status(200)
+      .json(new ApiResponse(200, "Split made successfully"));
   });
 
-
-    // gat all splits to pay
+  // get all splits to pay
   dueGiveSplit = asyncHandler(async (req: Request, res: Response) => {
     const { friendId } = req.params;
     if (!friendId) throw new ApiError(400, "Give the friend id");
 
-    const splits = await splitService.getDueToGive(this.getUserId(req), friendId.toString());
-    return res.status(200).json(new ApiResponse(200, "Get all due split to give", splits));
+    const splits = await splitService.getDueToGive(
+      this.getUserId(req),
+      friendId.toString()
+    );
+    return res
+      .status(200)
+      .json(new ApiResponse(200, "Get all due split to give", splits));
   });
 
-
-    // gat all splits tobe paid
+  // get all splits to be paid
   dueGetSplit = asyncHandler(async (req: Request, res: Response) => {
     const { friendId } = req.params;
     if (!friendId) throw new ApiError(400, "Give the friend id");
 
-    const splits = await splitService.getDueToGet(this.getUserId(req), friendId.toString());
-    return res.status(200).json(new ApiResponse(200, "Get all due split to give", splits));
+    const splits = await splitService.getDueToGet(
+      this.getUserId(req),
+      friendId.toString()
+    );
+    return res
+      .status(200)
+      .json(new ApiResponse(200, "Get all due split to give", splits));
   });
 
-
-    // detlete split from split from
+  // delete split
   deleteSplit = asyncHandler(async (req: Request, res: Response) => {
     const { splitId } = req.params;
     if (!splitId) throw new ApiError(400, "Give the SplitId");
@@ -72,9 +85,7 @@ class SplitController extends BaseController {
     return res.status(200).json(new ApiResponse(200, "Split deleted"));
   });
 
-
-
-    // pay all due
+  // pay all due
   payAllDueDone = asyncHandler(async (req: Request, res: Response) => {
     const { friendId } = req.params;
     if (!friendId) throw new ApiError(400, "Give the friendId");
@@ -83,9 +94,7 @@ class SplitController extends BaseController {
     return res.status(200).json(new ApiResponse(200, "Mark one due done"));
   });
 
-
-
-    // pay all due
+  // pay one due
   payDueDone = asyncHandler(async (req: Request, res: Response) => {
     const { splitId } = req.body as { splitId: string };
     if (!splitId) throw new ApiError(400, "Give the splitid");
@@ -94,9 +103,7 @@ class SplitController extends BaseController {
     return res.status(200).json(new ApiResponse(200, "Mark one due done"));
   });
 
-
-
-    //mark pay all due
+  // mark pay all due
   markAllDueDone = asyncHandler(async (req: Request, res: Response) => {
     const { friendId } = req.params;
     if (!friendId) throw new ApiError(400, "Give the friendId");
@@ -105,9 +112,7 @@ class SplitController extends BaseController {
     return res.status(200).json(new ApiResponse(200, "Mark one due done"));
   });
 
-
-
-  //mark pay one
+  // mark pay one
   markDueDone = asyncHandler(async (req: Request, res: Response) => {
     const { splitId } = req.body as { splitId: string };
     if (!splitId) throw new ApiError(400, "Give the splitid");

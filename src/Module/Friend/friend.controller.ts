@@ -8,8 +8,6 @@ import { FriendService } from "./friend.service";
 const friendService = new FriendService();
 
 class FriendController extends BaseController {
-
-
   // make request
   makeRequest = asyncHandler(async (req: Request, res: Response) => {
     const { requestTo } = req.params;
@@ -19,9 +17,7 @@ class FriendController extends BaseController {
     return res.status(200).json(new ApiResponse(200, "Request created"));
   });
 
-
-
-  //reject request
+  // reject request
   rejectRequest = asyncHandler(async (req: Request, res: Response) => {
     const { requestId } = req.params;
     if (!requestId) throw new ApiError(400, "Give the information");
@@ -30,10 +26,8 @@ class FriendController extends BaseController {
     return res.status(200).json(new ApiResponse(200, "Request rejected"));
   });
 
-
   // delete request
   delteRequest = asyncHandler(async (req: Request, res: Response) => {
-    console.log("Params:", req.params);
     const { requestId } = req.params;
     if (!requestId) throw new ApiError(400, "Give the information");
 
@@ -41,23 +35,21 @@ class FriendController extends BaseController {
     return res.status(200).json(new ApiResponse(200, "Request deleted"));
   });
 
-
-  // get all friend Recieved request 
+  // get all friend Received request
   getAllRequestRecieved = asyncHandler(async (req: Request, res: Response) => {
-    const requests = await friendService.getAllRequestsReceived(this.getUserId(req),);
+    const requests = await friendService.getAllRequestsReceived(this.getUserId(req));
     return res
       .status(200)
-      .json(new ApiResponse(200, "Get all request recievied", requests ?? []));
+      .json(new ApiResponse(200, "Get all request received", requests ?? []));
   });
 
-    // get all friend sened request 
+  // get all friend sent request
   getAllRequestDone = asyncHandler(async (req: Request, res: Response) => {
     const requests = await friendService.getAllRequestsSent(this.getUserId(req));
     return res
       .status(200)
       .json(new ApiResponse(200, "Get all request done", requests ?? []));
   });
-
 
   // accept request
   acceptRequest = asyncHandler(async (req: Request, res: Response) => {
@@ -68,8 +60,7 @@ class FriendController extends BaseController {
     return res.status(200).json(new ApiResponse(200, "Make them friend"));
   });
 
-
-  //all friend list
+  // all friend list
   getAllFriends = asyncHandler(async (req: Request, res: Response) => {
     const friends = await friendService.getAllFriends(this.getUserId(req));
     return res

@@ -1,83 +1,81 @@
-import mongoose from "mongoose";
 import { ApiError } from "../../utils/ApiError";
-import { BaseService } from "../../Base/Base.service";
-import { Account, AccountModel } from "./account.model";
-import { ExpenseModel } from "../Expense/expences.model";
-import { UserModel } from "../User/user.model";
+import { prisma } from "../../config/prisma";
 
-export class AccountService extends BaseService<Account> {
-  constructor() {
-    super(AccountModel);
-  }
-
-
+export class AccountService {
   // create account
   async createAccount(userId: string, accountName: string) {
-    const madeAccount = await this.create({ account: accountName, user: new mongoose.Types.ObjectId(userId) });
+    const madeAccount = await prisma.account.create({
+      data: {
+        account: accountName,
+        userId,
+      },
+    });
 
-    const user = await UserModel.findById(userId);
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
     if (!user) throw new ApiError(404, "User not found");
-    if(!user.primaryAccount)user.primaryAccount = madeAccount._id;
-    await user.save();
-    return madeAccount;
+
+    if (!user.primaryAccountId) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { primaryAccountId: madeAccount.id },
+      });
+    }
+
+    return {
+      ...madeAccount,
+      _id: madeAccount.id,
+    };
   }
 
-
-//   //get account and balance
+  // get account and balance
   async getAllAccountDetails(userId: string) {
-    const user = await UserModel.findById(userId).select("cashAccount primaryAccount");
-    const accounts = await AccountModel.aggregate([
-      { $match: { user: new mongoose.Types.ObjectId(userId) } },
-      {
-    $addFields: {
-      type: {
-        $switch: {
-          branches: [
-            { case: { $eq: ["$_id", user?.cashAccount] }, then: "cash" },
-            { case: { $eq: ["$_id", user?.primaryAccount] }, then: "primary" },
-          ],
-          default: "normal",
-        },
-      },
-    },
-  },
-      {
-        $lookup: {
-          from: "expenses",
-          localField: "_id",
-          foreignField: "account",
-          as: "expenses",
-        },
-      },
-      {
-        $addFields: {
-          balance: {
-            $sum: {
-              $map: {
-                input: "$expenses",
-                as: "exp",
-                in: {
-                  $cond: [
-                    "$$exp.isGiven",
-                    { $multiply: ["$$exp.amount", -1] },
-                    "$$exp.amount",
-                  ],
-                },
-              },
-            },
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { cashAccountId: true, primaryAccountId: true },
+    });
+
+    const accounts = await prisma.account.findMany({
+      where: { userId },
+      include: {
+        expenses: {
+          select: {
+            amount: true,
+            isGiven: true,
           },
         },
       },
-      { $project: { account: 1, balance: 1 , type:1} },
-    ]);
+    });
 
     if (!accounts.length) throw new ApiError(404, "No accounts found");
-    return accounts;
+
+    return accounts.map((acc) => {
+      const balance = acc.expenses.reduce((sum, exp) => {
+        return exp.isGiven ? sum - exp.amount : sum + exp.amount;
+      }, 0);
+
+      let type = "normal";
+      if (acc.id === user?.cashAccountId) {
+        type = "cash";
+      } else if (acc.id === user?.primaryAccountId) {
+        type = "primary";
+      }
+
+      return {
+        id: acc.id,
+        _id: acc.id,
+        account_id: acc.id,
+        account: acc.account,
+        account_name: acc.account,
+        user_id: acc.userId,
+        balance,
+        type,
+      };
+    });
   }
 
-
-
-// get account expense by date
+  // get account expense by date
   async getExpenseOfAccountByDates(
     userId: string,
     accountNo: string,
@@ -87,79 +85,104 @@ export class AccountService extends BaseService<Account> {
     await this._verifyOwnership(userId, accountNo);
 
     let start: Date;
-  let end: Date;
+    let end: Date;
 
-  if (!startDate || !endDate) {
-    start = new Date();
-    start.setDate(1);
-    start.setHours(0, 0, 0, 0);
+    if (!startDate || !endDate) {
+      start = new Date();
+      start.setDate(1);
+      start.setHours(0, 0, 0, 0);
 
-    end = new Date();
-    end.setMonth(end.getMonth() + 1);
-    end.setDate(0);
-    end.setHours(23, 59, 59, 999);
-  } else {
-    start = new Date(startDate);
-    end = new Date(endDate);
-  }
+      end = new Date();
+      end.setMonth(end.getMonth() + 1);
+      end.setDate(0);
+      end.setHours(23, 59, 59, 999);
+    } else {
+      start = new Date(startDate);
+      end = new Date(endDate);
+    }
+
     if (isNaN(start.getTime()) || isNaN(end.getTime()))
       throw new ApiError(400, "Invalid date format");
 
     return this._aggregateExpenses(accountNo, start, end);
   }
 
-
-    // delete account
+  // delete account
   async deleteAccount(userId: string, accountNo: string) {
     await this._verifyOwnership(userId, accountNo);
-    const accountObjectId = new mongoose.Types.ObjectId(accountNo);
-    const user = await UserModel.findById(userId);
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
     if (!user) throw new ApiError(404, "User not found");
+
     if (
-  (user.cashAccount as mongoose.Types.ObjectId)?.equals(accountObjectId) ||
-  (user.primaryAccount as mongoose.Types.ObjectId)?.equals(accountObjectId)
-)
+      user.cashAccountId === accountNo ||
+      user.primaryAccountId === accountNo
+    ) {
       throw new ApiError(400, "Cannot delete primary or cash account");
+    }
 
-    await ExpenseModel.deleteMany({ account: accountNo });
-    await this.deleteById(accountNo);
+    await prisma.expense.deleteMany({
+      where: { accountId: accountNo },
+    });
+
+    await prisma.account.delete({
+      where: { id: accountNo },
+    });
   }
-
-
 
   // verify the user
   private async _verifyOwnership(userId: string, accountNo: string) {
-    const account = await AccountModel.findById(accountNo);
+    const account = await prisma.account.findUnique({
+      where: { id: accountNo },
+    });
     if (!account) throw new ApiError(404, "Account not found");
-    this.assertOwnership(String(account.user), userId);
+    if (account.userId !== userId) throw new ApiError(403, "Access denied");
     return account;
   }
 
-
   // aggregate func
-  private async _aggregateExpenses(accountNo: string, startDate: Date, endDate: Date) {
-    const expenses = await ExpenseModel.aggregate([
-      {
-        $match: {
-          account: new mongoose.Types.ObjectId(accountNo),
-          date: { $gte: startDate, $lt: endDate },
+  private async _aggregateExpenses(
+    accountNo: string,
+    startDate: Date,
+    endDate: Date
+  ) {
+    const expenses = await prisma.expense.findMany({
+      where: {
+        accountId: accountNo,
+        date: {
+          gte: startDate,
+          lte: endDate,
         },
       },
-      {
-        $group: {
-          _id: null,
-          totalSpend: { $sum: { $cond: [{ $eq: ["$isGiven", true] }, "$amount", 0] } },
-          totalGet: { $sum: { $cond: [{ $eq: ["$isGiven", false] }, "$amount", 0] } },
-          expenses: { $push: "$$ROOT" },
-        },
+      orderBy: {
+        date: "desc",
       },
-    ]);
+    });
+
+    const totalSpend = expenses
+      .filter((e) => e.isGiven)
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    const totalGet = expenses
+      .filter((e) => !e.isGiven)
+      .reduce((sum, e) => sum + e.amount, 0);
 
     return {
       accountNo,
-      totalSpend: expenses[0]?.totalSpend ?? 0,
-      totalGet: expenses[0]?.totalGet ?? 0,
-      expenses: expenses[0]?.expenses ?? [],
+      totalSpend,
+      totalGet,
+      expenses: expenses.map((e) => ({
+        _id: e.id,
+        id: e.id,
+        amount: e.amount,
+        description: e.description,
+        isGiven: e.isGiven,
+        category: e.category.toLowerCase(),
+        date: e.date,
+        account: e.accountId,
+        user: e.userId,
+      })),
     };
   }
 }

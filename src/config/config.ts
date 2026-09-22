@@ -3,32 +3,30 @@ import dotenv from "dotenv";
 dotenv.config();
 
 interface Config {
-  mongoUrl: string;
-
-  dbHost: string;
-  dbUser: string;
-  dbPassword: string;
-  dbName: string;
-
-  mongoPort: number;
-  sqlPort: number;
+  databaseUrl: string;
+  port: number;
+  corsOrigin: string;
+  accessTokenSecret: string;
+  accessTokenExpiry: string;
+  refreshTokenSecret: string;
+  refreshTokenExpiry: string;
+  otpTokenSecret: string;
+  otpTokenExpiry: string;
 }
 
 export const config: Config = {
-  mongoUrl: process.env.MONGO_URL || "",
-
-  dbHost: process.env.DB_HOST || "127.0.0.1",
-  dbUser: process.env.DB_USER || "root",
-  dbPassword: process.env.DB_PASSWORD || "",
-  dbName: process.env.DB_NAME || "",
-
-  mongoPort: Number(process.env.MONGO_PORT) || 3000,
-  sqlPort: Number(process.env.SQL_PORT) || 4000,
+  databaseUrl: process.env.DATABASE_URL || "",
+  port: Number(process.env.PORT) || 4000,
+  corsOrigin: process.env.CORS_ORIGIN || "http://localhost:5173",
+  accessTokenSecret: process.env.ACCESS_TOKEN_SECRET || "DEFAULT_ACCESS_SECRET",
+  accessTokenExpiry: process.env.ACCESS_TOKEN_EXPIRY || "1d",
+  refreshTokenSecret: process.env.REFRESH_TOKEN_SECRET || "DEFAULT_REFRESH_SECRET",
+  refreshTokenExpiry: process.env.REFRESH_TOKEN_EXPIRY || "10d",
+  otpTokenSecret: process.env.OTP_TOKEN_SECRET || "DEFAULT_OTP_SECRET",
+  otpTokenExpiry: process.env.OTP_TOKEN_EXPIRY || "5m",
 };
 
 console.log(
-  "==> MONGO_URL:",
-  config.mongoUrl ? "Found ✅" : "Missing ❌"
+  "==> DATABASE_URL:",
+  config.databaseUrl ? "Found \u2705" : "Missing \u274c"
 );
-
-console.log("==> DB_NAME:", config.dbName);

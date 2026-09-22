@@ -1,9 +1,8 @@
 import { Router } from "express";
 import { verifyJwtToken } from "../../middleware/Auth.middleware";
-import {splitController} from "./split.controller"
+import { splitController } from "./split.controller";
 
 const splitRouter = Router();
-
 
 splitRouter.post("/createSingleSplit", verifyJwtToken, splitController.createSingleSplit);
 splitRouter.post("/createSplit", verifyJwtToken, splitController.createSplit);
@@ -14,6 +13,5 @@ splitRouter.post("/payAllDueDone/:friendId", verifyJwtToken, splitController.pay
 splitRouter.post("/payDueDone", verifyJwtToken, splitController.payDueDone);
 splitRouter.post("/markAllDueDone/:friendId", verifyJwtToken, splitController.markAllDueDone);
 splitRouter.post("/markDueDone", verifyJwtToken, splitController.markDueDone);
-
 
 export default splitRouter;

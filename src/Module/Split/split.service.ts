@@ -1,29 +1,36 @@
-import mongoose from "mongoose";
 import { ApiError } from "../../utils/ApiError";
-import { BaseService } from "../../Base/Base.service";
-import { Split, SplitModel } from "./split.model";
-import { ExpenseModel } from "../Expense/expences.model";
-import { UserModel } from "../User/user.model";
+import { prisma } from "../../config/prisma";
 
-export class SplitService extends BaseService<Split> {
-  constructor() {
-    super(SplitModel);
-  }
+export enum Category {
+  FOOD = "FOOD",
+  TRAVEL = "TRAVEL",
+  SHOPPING = "SHOPPING",
+  BILLS = "BILLS",
+}
 
-//create split to one friend
+export class SplitService {
+  // create split to one friend
   async createSingleSplit(data: {
     splitFrom: string;
     splitTo: string;
     amount: number;
     description: string;
   }) {
-    const split = await this.create({
-      splitFrom: new mongoose.Types.ObjectId(data.splitFrom),
-      splitTo: new mongoose.Types.ObjectId(data.splitTo),
-      amount: data.amount,
-      description: data.description,
+    const split = await prisma.split.create({
+      data: {
+        splitFromId: data.splitFrom,
+        splitToId: data.splitTo,
+        amount: Number(data.amount),
+        description: data.description,
+      },
     });
-    return split;
+
+    return {
+      ...split,
+      _id: split.id,
+      splitFrom: split.splitFromId,
+      splitTo: split.splitToId,
+    };
   }
 
   // make a group split
@@ -33,207 +40,305 @@ export class SplitService extends BaseService<Split> {
     details: Array<{ splitTo: string; amount: number }>
   ) {
     const splits = details.map((d) => ({
-      splitFrom: new mongoose.Types.ObjectId(userId),
-      splitTo: new mongoose.Types.ObjectId(d.splitTo),
-      amount: d.amount,
+      splitFromId: userId,
+      splitToId: d.splitTo,
+      amount: Number(d.amount),
       description,
     }));
-    await SplitModel.insertMany(splits);
+
+    await prisma.split.createMany({
+      data: splits,
+    });
   }
 
-
-  // gat all splits to pay
+  // get all splits to pay
   async getDueToGive(userId: string, friendId: string) {
-    return SplitModel.aggregate([
-      {
-        $match: {
-          splitFrom: new mongoose.Types.ObjectId(friendId),
-          splitTo: new mongoose.Types.ObjectId(userId),
-        },
+    const splits = await prisma.split.findMany({
+      where: {
+        splitFromId: friendId,
+        splitToId: userId,
       },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const totalAmount = splits.reduce((sum, s) => sum + s.amount, 0);
+
+    return [
       {
-        $group: {
-          _id: null,
-          totalAmount: { $sum: "$amount" },
-          splits: { $push: "$$ROOT" },
-        },
+        _id: null,
+        totalAmount,
+        splits: splits.map((s) => ({
+          ...s,
+          _id: s.id,
+          splitFrom: s.splitFromId,
+          splitTo: s.splitToId,
+        })),
       },
-    ]);
+    ];
   }
 
-
-  // gat all splits tobe paid
+  // get all splits to be paid
   async getDueToGet(userId: string, friendId: string) {
-    return SplitModel.aggregate([
-      {
-        $match: {
-          splitFrom: new mongoose.Types.ObjectId(userId),
-          splitTo: new mongoose.Types.ObjectId(friendId),
-        },
+    const splits = await prisma.split.findMany({
+      where: {
+        splitFromId: userId,
+        splitToId: friendId,
       },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const totalAmount = splits.reduce((sum, s) => sum + s.amount, 0);
+
+    return [
       {
-        $group: {
-          _id: null,
-          totalAmount: { $sum: "$amount" },
-          splits: { $push: "$$ROOT" },
-        },
+        _id: null,
+        totalAmount,
+        splits: splits.map((s) => ({
+          ...s,
+          _id: s.id,
+          splitFrom: s.splitFromId,
+          splitTo: s.splitToId,
+        })),
       },
-    ]);
+    ];
   }
 
-
-  // detlete split from split from
+  // delete split
   async deleteSplit(userId: string, splitId: string) {
-    const split = await SplitModel.findById(splitId);
+    const split = await prisma.split.findUnique({
+      where: { id: splitId },
+    });
     if (!split) throw new ApiError(404, "Split not found");
-    this.assertOwnership(String(split.splitFrom), userId);
-    await SplitModel.findByIdAndDelete(splitId);
+    this.assertOwnership(split.splitFromId, userId);
+
+    await prisma.split.delete({
+      where: { id: splitId },
+    });
   }
-
-
 
   // pay all due
   async payAllDue(userId: string, friendId: string) {
-    const splits = await SplitModel.find({
-      splitFrom: new mongoose.Types.ObjectId(friendId),
-      splitTo: new mongoose.Types.ObjectId(userId),
+    const splits = await prisma.split.findMany({
+      where: {
+        splitFromId: friendId,
+        splitToId: userId,
+      },
     });
     if (!splits.length) throw new ApiError(404, "No due splits found");
 
     const totalAmount = splits.reduce((sum, s) => sum + s.amount, 0);
     const [userFrom, userTo] = await this._resolveUsers(friendId, userId);
 
-    const accountFrom = userFrom.primaryAccount ?? userFrom.cashAccount;
-    const accountTo = userTo.primaryAccount ?? userTo.cashAccount;
+    const accountFrom = userFrom.primaryAccountId || userFrom.cashAccountId;
+    const accountTo = userTo.primaryAccountId || userTo.cashAccountId;
 
-    await Promise.all([
-      ExpenseModel.create({
-        amount: totalAmount,
-        description: `Splits from (${userTo.fullName})`,
-        isGiven: false,
-        account: accountFrom,
-        date: new Date(),
-      }),
-      ExpenseModel.create({
-        amount: totalAmount,
-        description: `Splits to (${userFrom.fullName})`,
-        isGiven: true,
-        account: accountTo,
-        date: new Date(),
-      }),
-    ]);
+    if (!accountFrom || !accountTo) {
+      throw new ApiError(400, "Account not found for transaction");
+    }
 
-    await SplitModel.deleteMany({ _id: { $in: splits.map((s) => s._id) } });
+    await prisma.$transaction(async (tx) => {
+      await tx.expense.create({
+        data: {
+          amount: totalAmount,
+          description: `Splits from (${userTo.fullName})`,
+          isGiven: false,
+          category: Category.BILLS,
+          accountId: accountFrom,
+          userId: userFrom.id,
+          date: new Date(),
+        },
+      });
+
+      await tx.expense.create({
+        data: {
+          amount: totalAmount,
+          description: `Splits to (${userFrom.fullName})`,
+          isGiven: true,
+          category: Category.BILLS,
+          accountId: accountTo,
+          userId: userTo.id,
+          date: new Date(),
+        },
+      });
+
+      await tx.split.deleteMany({
+        where: {
+          id: { in: splits.map((s) => s.id) },
+        },
+      });
+    });
   }
 
-
-  // pay all due
+  // pay one due
   async payOneDue(userId: string, splitId: string) {
-    const split = await SplitModel.findById(splitId);
+    const split = await prisma.split.findUnique({
+      where: { id: splitId },
+    });
     if (!split) throw new ApiError(404, "Split not found");
-    // userId must be the splitTo (the one being paid back)
-    this.assertOwnership(String(split.splitTo), userId);
+    // userId must be splitTo (the recipient who is being paid back)
+    this.assertOwnership(split.splitToId, userId);
 
     const [userFrom, userTo] = await this._resolveUsers(
-      String(split.splitFrom),
+      split.splitFromId,
       userId
     );
 
-    const accountFrom = userFrom.primaryAccount ?? userFrom.cashAccount;
-    const accountTo = userTo.primaryAccount ?? userTo.cashAccount;
+    const accountFrom = userFrom.primaryAccountId || userFrom.cashAccountId;
+    const accountTo = userTo.primaryAccountId || userTo.cashAccountId;
 
-    await Promise.all([
-      ExpenseModel.create({
-        amount: split.amount,
-        description: `${split.description} from (${userTo.fullName})`,
-        isGiven: false,
-        account: accountFrom,
-        date: new Date(),
-      }),
-      ExpenseModel.create({
-        amount: split.amount,
-        description: `${split.description} to (${userFrom.fullName})`,
-        isGiven: true,
-        account: accountTo,
-        date: new Date(),
-      }),
-    ]);
+    if (!accountFrom || !accountTo) {
+      throw new ApiError(400, "Account not found for transaction");
+    }
 
-    await SplitModel.findByIdAndDelete(splitId);
+    await prisma.$transaction(async (tx) => {
+      await tx.expense.create({
+        data: {
+          amount: split.amount,
+          description: `${split.description} from (${userTo.fullName})`,
+          isGiven: false,
+          category: Category.BILLS,
+          accountId: accountFrom,
+          userId: userFrom.id,
+          date: new Date(),
+        },
+      });
+
+      await tx.expense.create({
+        data: {
+          amount: split.amount,
+          description: `${split.description} to (${userFrom.fullName})`,
+          isGiven: true,
+          category: Category.BILLS,
+          accountId: accountTo,
+          userId: userTo.id,
+          date: new Date(),
+        },
+      });
+
+      await tx.split.delete({
+        where: { id: splitId },
+      });
+    });
   }
 
-
-  //mark pay all due
+  // mark all due done
   async markAllDueDone(userId: string, friendId: string) {
-    const splits = await SplitModel.find({
-      splitFrom: new mongoose.Types.ObjectId(userId),
-      splitTo: new mongoose.Types.ObjectId(friendId),
+    const splits = await prisma.split.findMany({
+      where: {
+        splitFromId: userId,
+        splitToId: friendId,
+      },
     });
     if (!splits.length) throw new ApiError(404, "No splits found");
 
     const totalAmount = splits.reduce((sum, s) => sum + s.amount, 0);
     const [userFrom, userTo] = await this._resolveUsers(friendId, userId);
 
-    await Promise.all([
-      ExpenseModel.create({
-        amount: totalAmount,
-        description: `Splits from (${userTo.fullName})`,
-        isGiven: false,
-        account: userFrom.cashAccount,
-        date: new Date(),
-      }),
-      ExpenseModel.create({
-        amount: totalAmount,
-        description: `Splits to (${userFrom.fullName})`,
-        isGiven: true,
-        account: userTo.cashAccount,
-        date: new Date(),
-      }),
-    ]);
+    const accountFrom = userFrom.cashAccountId || userFrom.primaryAccountId;
+    const accountTo = userTo.cashAccountId || userTo.primaryAccountId;
 
-    await SplitModel.deleteMany({ _id: { $in: splits.map((s) => s._id) } });
+    if (!accountFrom || !accountTo) {
+      throw new ApiError(400, "Cash account not found");
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.expense.create({
+        data: {
+          amount: totalAmount,
+          description: `Splits from (${userTo.fullName})`,
+          isGiven: false,
+          category: Category.BILLS,
+          accountId: accountFrom,
+          userId: userFrom.id,
+          date: new Date(),
+        },
+      });
+
+      await tx.expense.create({
+        data: {
+          amount: totalAmount,
+          description: `Splits to (${userFrom.fullName})`,
+          isGiven: true,
+          category: Category.BILLS,
+          accountId: accountTo,
+          userId: userTo.id,
+          date: new Date(),
+        },
+      });
+
+      await tx.split.deleteMany({
+        where: {
+          id: { in: splits.map((s) => s.id) },
+        },
+      });
+    });
   }
 
-  
-
-  //mark pay one
+  // mark one due done
   async markOneDueDone(userId: string, splitId: string) {
-    const split = await SplitModel.findById(splitId);
+    const split = await prisma.split.findUnique({
+      where: { id: splitId },
+    });
     if (!split) throw new ApiError(404, "Split not found");
-    this.assertOwnership(String(split.splitFrom), userId);
+    this.assertOwnership(split.splitFromId, userId);
+
     const [userTo, user] = await this._resolveUsers(
-      String(split.splitTo),
+      split.splitToId,
       userId
     );
 
-    await Promise.all([
-      ExpenseModel.create({
-        amount: split.amount,
-        description: `${split.description} from (${userTo.fullName})`,
-        isGiven: false,
-        account: user.cashAccount,
-        date: new Date(),
-      }),
-      ExpenseModel.create({
-        amount: split.amount,
-        description: `${split.description} to (${user.fullName})`,
-        isGiven: true,
-        account: userTo.cashAccount,
-        date: new Date(),
-      }),
-    ]);
+    const accountFrom = user.cashAccountId || user.primaryAccountId;
+    const accountTo = userTo.cashAccountId || userTo.primaryAccountId;
 
-    await SplitModel.findByIdAndDelete(splitId);
+    if (!accountFrom || !accountTo) {
+      throw new ApiError(400, "Cash account not found");
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.expense.create({
+        data: {
+          amount: split.amount,
+          description: `${split.description} from (${userTo.fullName})`,
+          isGiven: false,
+          category: Category.BILLS,
+          accountId: accountFrom,
+          userId: user.id,
+          date: new Date(),
+        },
+      });
+
+      await tx.expense.create({
+        data: {
+          amount: split.amount,
+          description: `${split.description} to (${user.fullName})`,
+          isGiven: true,
+          category: Category.BILLS,
+          accountId: accountTo,
+          userId: userTo.id,
+          date: new Date(),
+        },
+      });
+
+      await tx.split.delete({
+        where: { id: splitId },
+      });
+    });
   }
 
-  //Private Helpers 
-
+  // Private Helpers
   private async _resolveUsers(idA: string, idB: string) {
     const [userA, userB] = await Promise.all([
-      UserModel.findById(idA),
-      UserModel.findById(idB),
+      prisma.user.findUnique({ where: { id: idA } }),
+      prisma.user.findUnique({ where: { id: idB } }),
     ]);
-    if (!userA || !userB) throw new ApiError(404, "One or both users not found");
+    if (!userA || !userB)
+      throw new ApiError(404, "One or both users not found");
     return [userA, userB] as const;
+  }
+
+  private assertOwnership(ownerId: string, resourceOwnerId: string): void {
+    if (String(ownerId) !== String(resourceOwnerId)) {
+      throw new ApiError(403, "Access denied");
+    }
   }
 }

@@ -1,47 +1,75 @@
-import jwt from "jsonwebtoken";
+import bcrypt from "bcrypt";
+import jwt, { SignOptions } from "jsonwebtoken";
 import { ApiError } from "../../utils/ApiError";
-import { BaseService } from "../../Base/Base.service";
-console.log("user");
-import { User, UserModel } from "./user.model";
-console.log("account");
-import { AccountModel } from "../Account/account.model";
-import { generateOTP } from "../../utils/otp"; // plug in your OTP util
-console.log("exp");
-import { ExpenseModel } from "../Expense/expences.model";
-import mongoose from "mongoose";
+import { generateOTP } from "../../utils/otp";
+import { prisma } from "../../config/prisma";
 
-export class UserService extends BaseService<User> {
-  constructor() {
-    super(UserModel);
-  }
-
+export class UserService {
   // ─── Token Helpers ────────────────────────────────────────────────────────
 
+  private generateAccessToken(user: {
+    id: string;
+    email: string;
+    userName: string;
+    fullName: string;
+  }): string {
+    const secret = process.env.ACCESS_TOKEN_SECRET;
+    const expiry = process.env.ACCESS_TOKEN_EXPIRY;
+    if (!secret || !expiry) throw new Error("ACCESS_TOKEN env vars missing");
+
+    return jwt.sign(
+      {
+        id: user.id,
+        _id: user.id,
+        fullName: user.fullName,
+        email: user.email,
+        userName: user.userName,
+      },
+      secret,
+      { expiresIn: expiry as SignOptions["expiresIn"] }
+    );
+  }
+
+  private generateRefreshToken(userId: string): string {
+    const secret = process.env.REFRESH_TOKEN_SECRET;
+    const expiry = process.env.REFRESH_TOKEN_EXPIRY;
+    if (!secret || !expiry) throw new Error("REFRESH_TOKEN env vars missing");
+
+    return jwt.sign(
+      { id: userId, _id: userId },
+      secret,
+      { expiresIn: expiry as SignOptions["expiresIn"] }
+    );
+  }
+
   async generateTokens(userId: string) {
-    const user = await UserModel.findById(userId);
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
     if (!user) throw new ApiError(404, "User not found");
 
-    const accessToken = user.generateAccessToken();
-    const refreshToken = user.generateRefreshToken();
-    user.refreshToken = refreshToken;
-    await user.save({ validateBeforeSave: false });
+    const accessToken = this.generateAccessToken(user);
+    const refreshToken = this.generateRefreshToken(user.id);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { refreshToken },
+    });
 
     return { accessToken, refreshToken };
   }
 
-  private async generateOtpToken(userId: string): Promise<string> {
-    const user = await UserModel.findById(userId);
-    if (!user) throw new ApiError(404, "User not found");
+  private generateOtpToken(userId: string, email: string): string {
+    const secret = process.env.OTP_TOKEN_SECRET;
+    const expiry = process.env.OTP_TOKEN_EXPIRY;
+    if (!secret || !expiry) throw new Error("OTP_TOKEN env vars missing");
 
-    const otpToken = user.generateOtpToken();
-    //user.passwordResetToken = otpToken;
-    user.passwordResetOTP = undefined;
-    user.passwordResetExpires = undefined;
-    await user.save({ validateBeforeSave: false });
-
-    return otpToken;
+    return jwt.sign(
+      { id: userId, _id: userId, email },
+      secret,
+      { expiresIn: expiry as SignOptions["expiresIn"] }
+    );
   }
-
 
   // register the user
   async registerUser(data: {
@@ -52,201 +80,295 @@ export class UserService extends BaseService<User> {
   }) {
     const { userName, fullName, email, password } = data;
 
-    const exists = await this.exists({
-      $or: [{ email }, { userName: userName.toLowerCase() }],
+    const exists = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: email.toLowerCase() },
+          { userName: userName.toLowerCase() },
+        ],
+      },
     });
     if (exists) throw new ApiError(409, "User already exists");
 
-    const user = await this.create({ userName, fullName, email, password });
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    const cashAccount = await AccountModel.create({
-      account: "cash",
-      user: user._id,
+    const createdUser = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          userName: userName.toLowerCase(),
+          fullName,
+          email: email.toLowerCase(),
+          password: hashedPassword,
+        },
+      });
+
+      const cashAccount = await tx.account.create({
+        data: {
+          account: "cash",
+          userId: user.id,
+        },
+      });
+
+      const updated = await tx.user.update({
+        where: { id: user.id },
+        data: {
+          cashAccountId: cashAccount.id,
+        },
+        select: {
+          id: true,
+          userName: true,
+          fullName: true,
+          email: true,
+          cashAccountId: true,
+          primaryAccountId: true,
+          createdAt: true,
+        },
+      });
+
+      return {
+        ...updated,
+        _id: updated.id,
+      };
     });
 
-    await UserModel.findByIdAndUpdate(
-      user._id,
-      { cashAccount: cashAccount._id },
-      { new: true }
-    );
-
-    const createdUser = await UserModel.findById(user._id).select(
-      "-password -refreshToken"
-    );
     if (!createdUser) throw new ApiError(500, "User creation failed");
-
     return createdUser;
   }
 
-
   // login the user
   async loginUser(loginInfo: string, password: string) {
-    const user = await UserModel.findOne({
-      $or: [{ email: loginInfo.trim() }, { userName: loginInfo.trim() }],
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: loginInfo.trim().toLowerCase() },
+          { userName: loginInfo.trim().toLowerCase() },
+        ],
+      },
     });
     if (!user) throw new ApiError(404, "User not found");
 
-    const isValid = await user.isPasswordCorrect(password);
+    const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) throw new ApiError(401, "Incorrect password");
 
-    const { accessToken, refreshToken } = await this.generateTokens(
-      String(user._id)
-    );
+    const { accessToken, refreshToken } = await this.generateTokens(user.id);
 
-    const loginData = await UserModel.findById(user._id).select(
-      "-password -refreshToken -cashAccount -primaryAccount"
-    );
+    const loginData = {
+      id: user.id,
+      _id: user.id,
+      userName: user.userName,
+      fullName: user.fullName,
+      email: user.email,
+    };
 
     return { loginData, accessToken, refreshToken };
   }
 
-
   // logout the user
   async logoutUser(userId: string) {
-    await UserModel.findByIdAndUpdate(userId, { $unset: { refreshToken: 1 } });
+    await prisma.user.update({
+      where: { id: userId },
+      data: { refreshToken: null },
+    });
   }
 
-  //me
- async me(userId: string) {
-    const user = await UserModel.findById(userId).select("id fullName userName email");
-    if(!user) throw new ApiError(404 , "user not found");
-    return user;
-
+  // me
+  async me(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        fullName: true,
+        userName: true,
+        email: true,
+      },
+    });
+    if (!user) throw new ApiError(404, "user not found");
+    return {
+      ...user,
+      _id: user.id,
+    };
   }
-    // reset refresh token
+
+  // reset refresh token
   async resetRefreshToken(incomingRefToken: string) {
     const secret = process.env.REFRESH_TOKEN_SECRET;
     if (!secret) throw new ApiError(500, "REFRESH_TOKEN_SECRET not configured");
 
-    const decoded = jwt.verify(incomingRefToken, secret) as { _id: string };
-    const user = await UserModel.findById(decoded._id);
+    const decoded = jwt.verify(incomingRefToken, secret) as {
+      id?: string;
+      _id?: string;
+    };
+    const userId = decoded.id || decoded._id;
+    if (!userId) throw new ApiError(401, "Invalid token");
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
     if (!user) throw new ApiError(401, "Invalid token");
     if (user.refreshToken !== incomingRefToken)
       throw new ApiError(401, "Refresh token expired or already used");
 
-    return this.generateTokens(String(user._id));
+    return this.generateTokens(user.id);
   }
 
-
-  //forgot password
+  // forgot password
   async initForgotPassword(email: string) {
-    const user = await UserModel.findOne({ email });
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
     if (!user) throw new ApiError(404, "Account does not exist");
 
     const otp = generateOTP();
-    user.passwordResetOTP = otp;
-    user.passwordResetExpires = new Date(Date.now() + 5 * 60 * 1000);
-    await user.save({ validateBeforeSave: false });
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetOTP: otp,
+        passwordResetExpires: new Date(Date.now() + 5 * 60 * 1000),
+      },
+    });
 
-    // TODO: plug in your mailer
     return otp;
   }
 
-
-  //verify otp for password
+  // verify otp for password
   async verifyOtp(email: string, otp: string) {
-    const user = await UserModel.findOne({
-      email,
-      passwordResetOTP: otp,
-      passwordResetExpires: { $gt: new Date() },
+    const user = await prisma.user.findFirst({
+      where: {
+        email: email.toLowerCase(),
+        passwordResetOTP: otp,
+        passwordResetExpires: {
+          gt: new Date(),
+        },
+      },
     });
     if (!user) throw new ApiError(400, "Invalid or expired OTP");
-    return this.generateOtpToken(String(user._id));
-  }
 
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetOTP: null,
+        passwordResetExpires: null,
+      },
+    });
+
+    return this.generateOtpToken(user.id, user.email);
+  }
 
   // update password
   async updatePassword(userId: string, password: string) {
-    const user = await UserModel.findById(userId);
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
     if (!user) throw new ApiError(404, "User not found");
-    user.password = password;
-    //user.passwordResetToken = undefined;
-    await user.save({ validateBeforeSave: false });
-  }
 
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        password: hashedPassword,
+        passwordResetOTP: null,
+        passwordResetExpires: null,
+      },
+    });
+  }
 
   // find a user
   async findUser(loginInfo: string) {
-    const user = await UserModel.findOne({
-      $or: [{ email: loginInfo.trim() }, { userName: loginInfo.trim() }],
-    }).select("userName email fullName");
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: loginInfo.trim().toLowerCase() },
+          { userName: loginInfo.trim().toLowerCase() },
+        ],
+      },
+      select: {
+        id: true,
+        userName: true,
+        email: true,
+        fullName: true,
+      },
+    });
     if (!user) throw new ApiError(404, "No account found");
-    return user;
+    return {
+      ...user,
+      _id: user.id,
+    };
   }
 
+  // get expense with dates
+  async getExpenseOfUserByDates(
+    userId: string,
+    startDate?: string,
+    endDate?: string
+  ) {
+    let start: Date;
+    let end: Date;
 
-  // grt expense with dates
-async getExpenseOfUserByDates(userId: string, startDate?: string, endDate?: string) {
-  let start: Date;
-  let end: Date;
+    if (!startDate || !endDate) {
+      start = new Date();
+      start.setDate(1);
+      start.setHours(0, 0, 0, 0);
 
-  if (!startDate || !endDate) {
-    start = new Date();
-    start.setDate(1);
-    start.setHours(0, 0, 0, 0);
+      end = new Date();
+      end.setMonth(end.getMonth() + 1);
+      end.setDate(0);
+      end.setHours(23, 59, 59, 999);
+    } else {
+      start = new Date(startDate);
+      end = new Date(endDate);
+    }
 
-    end = new Date();
-    end.setMonth(end.getMonth() + 1);
-    end.setDate(0);
-    end.setHours(23, 59, 59, 999);
-  } else {
-    start = new Date(startDate);
-    end = new Date(endDate);
+    const expenses = await prisma.expense.findMany({
+      where: {
+        userId,
+        date: {
+          gte: start,
+          lte: end,
+        },
+      },
+      orderBy: {
+        date: "desc",
+      },
+    });
+
+    return expenses.map((e) => ({
+      _id: e.id,
+      id: e.id,
+      expenseId: e.id,
+      amount: e.amount,
+      desc: e.description,
+      date: e.date,
+      isGiven: e.isGiven,
+      account: e.accountId,
+      category: e.category.toLowerCase(),
+    }));
   }
-
-  const expenses = await ExpenseModel.aggregate([
-    {
-      $match: {
-        date: { $gte: start, $lte: end },
-      },
-    },
-    {
-      $lookup: {
-        from: "accounts",
-        localField: "account",
-        foreignField: "_id",
-        as: "accounts",
-      },
-    },
-    { $unwind: "$accounts" },                                   
-    {
-      $match: {
-        "accounts.user": new mongoose.Types.ObjectId(userId),
-      },
-    },
-    {
-      $project: {
-        _id: 1,
-        expenseId: "$_id",
-        amount: "$amount",
-        desc: "$description",
-        date: "$date",
-        isGiven: "$isGiven",
-        account: "$account",
-      },
-    },
-    { $sort: { date: -1 } },
-  ]);
-
-  return expenses;
-}
-
 
   // change Primary acc
   async changePrimaryAccount(userId: string, accountId: string) {
-    const account = await AccountModel.findById(accountId);
+    const account = await prisma.account.findUnique({
+      where: { id: accountId },
+    });
     if (!account) throw new ApiError(404, "Account not found");
-    this.assertOwnership(String(account.user), userId);
+    if (account.userId !== userId) throw new ApiError(403, "Access denied");
 
-    const user = await UserModel.findById(userId);
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
     if (!user) throw new ApiError(404, "User not found");
-    if (
-  String(user.cashAccount) === accountId ||
-  String(user.primaryAccount) === accountId
-)
-      throw new ApiError(400, "Choose a different account");
 
-    user.primaryAccount = account._id;
-    await user.save({ validateBeforeSave: false });
+    if (
+      user.cashAccountId === accountId ||
+      user.primaryAccountId === accountId
+    ) {
+      throw new ApiError(400, "Choose a different account");
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        primaryAccountId: account.id,
+      },
+    });
   }
 }

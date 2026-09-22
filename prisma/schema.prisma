@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Category {
+  FOOD
+  TRAVEL
+  SHOPPING
+  BILLS
+}
+
+model User {
+  id                     String          @id @default(uuid())
+  userName               String          @unique
+  fullName               String
+  email                  String          @unique
+  password               String
+  refreshToken           String?
+  passwordResetOTP       String?
+  passwordResetExpires   DateTime?
+  cashAccountId          String?
+  primaryAccountId       String?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+
+  accounts               Account[]       @relation("UserAccounts")
+  expenses               Expense[]       @relation("UserExpenses")
+
+  friendRequestsSent     FriendRequest[] @relation("RequestsSent")
+  friendRequestsReceived FriendRequest[] @relation("RequestsReceived")
+
+  friendsAsUserA         Friend[]        @relation("FriendsAsUserA")
+  friendsAsUserB         Friend[]        @relation("FriendsAsUserB")
+
+  splitsFrom             Split[]         @relation("SplitsFrom")
+  splitsTo               Split[]         @relation("SplitsTo")
+
+  @@map("users")
+}
+
+model Account {
+  id        String    @id @default(uuid())
+  account   String
+  userId    String
+  user      User      @relation("UserAccounts", fields: [userId], references: [id], onDelete: Cascade)
+  expenses  Expense[] @relation("AccountExpenses")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("accounts")
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  amount      Float
+  description String
+  isGiven     Boolean
+  category    Category
+  date        DateTime @default(now())
+  userId      String
+  user        User     @relation("UserExpenses", fields: [userId], references: [id], onDelete: Cascade)
+  accountId   String
+  account     Account  @relation("AccountExpenses", fields: [accountId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("expenses")
+}
+
+model FriendRequest {
+  id            String   @id @default(uuid())
+  requestFromId String
+  requestFrom   User     @relation("RequestsSent", fields: [requestFromId], references: [id], onDelete: Cascade)
+  requestToId   String
+  requestTo     User     @relation("RequestsReceived", fields: [requestToId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([requestFromId, requestToId])
+  @@map("friend_requests")
+}
+
+model Friend {
+  id        String   @id @default(uuid())
+  userAId   String
+  userA     User     @relation("FriendsAsUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userBId   String
+  userB     User     @relation("FriendsAsUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userAId, userBId])
+  @@map("friends")
+}
+
+model Split {
+  id          String   @id @default(uuid())
+  splitFromId String
+  splitFrom   User     @relation("SplitsFrom", fields: [splitFromId], references: [id], onDelete: Cascade)
+  splitToId   String
+  splitTo     User     @relation("SplitsTo", fields: [splitToId], references: [id], onDelete: Cascade)
+  amount      Float
+  description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("splits")
+}
