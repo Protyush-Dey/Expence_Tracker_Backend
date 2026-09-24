@@ -20,7 +20,9 @@ export abstract class BaseController {
 
   // options of cookie config
   protected readonly cookieOptions = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-  } as const;
+  httpOnly: true,
+  secure: true,
+  sameSite: "none" as const,
+  path: "/",
+};
 }
